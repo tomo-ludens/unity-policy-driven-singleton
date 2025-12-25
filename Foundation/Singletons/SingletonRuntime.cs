@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Foundation
+namespace Foundation.Singletons
 {
     /// <summary>
     /// Central runtime lifecycle for singleton infrastructure.
