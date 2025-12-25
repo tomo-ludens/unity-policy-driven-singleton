@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Foundation
+namespace Foundation.Singletons
 {
     /// <summary>
     /// Type-per-singleton base class for <see cref="MonoBehaviour"/>.
