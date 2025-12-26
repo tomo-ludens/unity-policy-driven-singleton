@@ -4,7 +4,7 @@ namespace Foundation.Singletons
 {
     /// <summary>
     /// Central runtime lifecycle for singleton infrastructure.
-    /// Owns play-session initialization and quitting state.
+    /// Owns Play session initialization and quitting state.
     /// </summary>
     /// <remarks>
     /// Initialization runs at <see cref="RuntimeInitializeLoadType.SubsystemRegistration"/>,
@@ -28,7 +28,7 @@ namespace Foundation.Singletons
         /// Increments <see cref="PlaySessionId"/>, clears <see cref="IsQuitting"/>, and (re)subscribes to
         /// <see cref="Application.quitting"/> to avoid duplicate handlers when Domain Reload is disabled.
         /// </summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        [RuntimeInitializeOnLoadMethod(loadType: RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Initialize()
         {
             if (PlaySessionId < int.MaxValue) PlaySessionId++;
@@ -42,6 +42,9 @@ namespace Foundation.Singletons
         /// <summary>
         /// Marks the runtime as quitting to prevent late singleton creation during shutdown.
         /// </summary>
-        private static void OnQuitting() => IsQuitting = true;
+        private static void OnQuitting()
+        {
+            IsQuitting = true;
+        }
     }
 }
