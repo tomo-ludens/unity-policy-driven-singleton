@@ -1,18 +1,24 @@
-using System;
 using Singletons.Policy;
 using UnityEngine;
 
 namespace Singletons.Core
 {
     /// <summary>
-    /// Core singleton implementation driven by policy.
+    /// Policy-driven singleton MonoBehaviour.
     /// </summary>
     /// <remarks>
+    /// <para><b>CRITICAL - EXACT TYPE MATCH:</b> Do NOT subclass derived singletons.
+    /// <c>class Derived : MySingleton</c> accessing <c>MySingleton.Instance</c> will fail type check.
+    /// Each concrete singleton must directly inherit SingletonBehaviour.</para>
+    /// <para><b>STATIC FIELD ISOLATION:</b> <c>_instance</c> and <c>_cachedPlaySessionId</c> are
+    /// per generic type instantiation (T, TPolicy pair). Different T creates independent singletons.</para>
+    /// <para><b>RELEASE BUILD BEHAVIOR:</b> <see cref="SingletonLogger.ThrowInvalidOperation"/> calls
+    /// are stripped in release builds. Code continues past validation failures returning null.
+    /// DEV/EDITOR builds throw exceptions for fail-fast debugging.</para>
     /// <list type="bullet">
-    ///   <item>All public API must be called from the main thread.</item>
-    ///   <item>In DEV/EDITOR, missing instance with auto-create disabled throws.</item>
-    ///   <item>Override Awake/OnEnable/OnDestroy requires calling base method.</item>
-    ///   <item>Prefer OnSingletonAwake/OnSingletonDestroy over Awake/OnDestroy override.</item>
+    ///   <item>Main thread only for all public API.</item>
+    ///   <item>Override Awake/OnEnable/OnDestroy requires base call.</item>
+    ///   <item>Prefer OnSingletonAwake/OnSingletonDestroy hooks.</item>
     /// </list>
     /// </remarks>
     public abstract class SingletonBehaviour<T, TPolicy> : MonoBehaviour
@@ -24,6 +30,7 @@ namespace Singletons.Core
 
         private static readonly TPolicy Policy = default;
 
+        // Per generic instantiation (T, TPolicy). Not shared across different T.
         // ReSharper disable once StaticMemberInGenericType
         private static T _instance;
 
@@ -34,8 +41,7 @@ namespace Singletons.Core
         private bool _isPersistent;
 
         /// <summary>
-        /// Returns the singleton instance.
-        /// Auto-creates if missing and policy allows (Play Mode only).
+        /// Returns singleton instance. Returns null during quit, from background thread, or if validation fails in release.
         /// </summary>
         public static T Instance
         {
@@ -60,19 +66,33 @@ namespace Singletons.Core
                 if (_instance != null) return _instance;
 
                 var candidate = FindAnyObjectByType<T>(findObjectsInactive: FindInactivePolicy);
-                _instance = AsExactType(candidate: candidate, callerContext: $"{typeof(T).Name}.Instance[PlayMode]");
-                if (_instance != null) return _instance;
+                candidate = AsExactType(candidate: candidate, callerContext: $"{typeof(T).Name}.Instance[PlayMode]");
+
+                if (candidate != null)
+                {
+                    if (!candidate.isActiveAndEnabled)
+                    {
+                        // In release: call stripped, returns null below.
+                        SingletonLogger.ThrowInvalidOperation(
+                            message: $"[{typeof(T).Name}] Inactive/disabled instance detected.\n" +
+                                     $"Found: '{candidate.name}' (type: '{candidate.GetType().Name}').\n" +
+                                     "Enable/activate it or remove it from the scene."
+                        );
+                        return null;
+                    }
+
+                    candidate.InitializeForCurrentPlaySessionIfNeeded();
+                    if (_instance != null) return _instance;
+                }
 
                 if (!Policy.AutoCreateIfMissing)
                 {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    throw new InvalidOperationException(
+                    // In release: call stripped, returns null below.
+                    SingletonLogger.ThrowInvalidOperation(
                         message: $"[{typeof(T).Name}] No instance found and auto-creation is disabled by policy.\n" +
                                  "Place an active instance in the scene."
                     );
-#else
                     return null;
-#endif
                 }
 
                 AssertNoInactiveInstanceExists();
@@ -83,7 +103,7 @@ namespace Singletons.Core
         }
 
         /// <summary>
-        /// Gets the singleton instance without creating one.
+        /// Non-creating lookup. Does NOT trigger auto-create even if policy allows.
         /// </summary>
         public static bool TryGetInstance(out T instance)
         {
@@ -116,11 +136,28 @@ namespace Singletons.Core
 
             var candidate = FindAnyObjectByType<T>(findObjectsInactive: FindInactivePolicy);
             candidate = AsExactType(candidate: candidate, callerContext: $"{typeof(T).Name}.TryGetInstance[PlayMode]");
+
             if (candidate != null)
             {
-                _instance = candidate;
-                instance = _instance;
-                return true;
+                if (!candidate.isActiveAndEnabled)
+                {
+                    // In release: call stripped, returns false below.
+                    SingletonLogger.ThrowInvalidOperation(
+                        message: $"[{typeof(T).Name}] Inactive/disabled instance detected.\n" +
+                                 $"Found: '{candidate.name}' (type: '{candidate.GetType().Name}').\n" +
+                                 "Enable/activate it or remove it from the scene."
+                    );
+                    instance = null;
+                    return false;
+                }
+
+                candidate.InitializeForCurrentPlaySessionIfNeeded();
+
+                if (_instance != null)
+                {
+                    instance = _instance;
+                    return true;
+                }
             }
 
             instance = null;
@@ -128,7 +165,7 @@ namespace Singletons.Core
         }
 
         /// <summary>
-        /// Override requires calling base.Awake(). Prefer OnSingletonAwake().
+        /// Override requires base.Awake() call.
         /// </summary>
         protected virtual void Awake()
         {
@@ -138,7 +175,7 @@ namespace Singletons.Core
         }
 
         /// <summary>
-        /// Override requires calling base.OnEnable().
+        /// Override requires base.OnEnable() call.
         /// </summary>
         protected virtual void OnEnable()
         {
@@ -148,7 +185,7 @@ namespace Singletons.Core
         }
 
         /// <summary>
-        /// Override requires calling base.OnDestroy(). Prefer OnSingletonDestroy().
+        /// Override requires base.OnDestroy() call.
         /// </summary>
         protected virtual void OnDestroy()
         {
@@ -159,14 +196,18 @@ namespace Singletons.Core
         }
 
         /// <summary>
-        /// Called once per Play session after singleton is established.
+        /// Called once per Play session after singleton established.
         /// </summary>
-        protected virtual void OnSingletonAwake() { }
+        protected virtual void OnSingletonAwake()
+        {
+        }
 
         /// <summary>
-        /// Called when singleton instance is destroyed.
+        /// Called when THIS instance is destroyed as the singleton. NOT called for destroyed duplicates.
         /// </summary>
-        protected virtual void OnSingletonDestroy() { }
+        protected virtual void OnSingletonDestroy()
+        {
+        }
 
         private static T CreateInstance()
         {
@@ -183,12 +224,11 @@ namespace Singletons.Core
             // Ensure initialization even if derived Awake doesn't call base.
             instance.InitializeForCurrentPlaySessionIfNeeded();
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.LogWarning(
+            SingletonLogger.LogWarning(
                 message: $"[{typeof(T).Name}] Auto-created.",
                 context: instance
             );
-#endif
+
             return instance;
         }
 
@@ -201,13 +241,11 @@ namespace Singletons.Core
                 return candidate;
             }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.LogError(
+            SingletonLogger.LogError(
                 message: $"[{typeof(T).Name}] Type mismatch found via '{callerContext}'.\n" +
                          $"Expected EXACT type '{typeof(T).Name}', but found '{candidate.GetType().Name}'.",
                 context: candidate
             );
-#endif
 
             if (Application.isPlaying)
             {
@@ -217,23 +255,23 @@ namespace Singletons.Core
             return null;
         }
 
+        // In release: entire method call stripped, FindObjectsByType not executed.
+        [System.Diagnostics.Conditional(conditionString: "UNITY_EDITOR"), System.Diagnostics.Conditional(conditionString: "DEVELOPMENT_BUILD")]
         private static void AssertNoInactiveInstanceExists()
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
             var allInstances = FindObjectsByType<T>(findObjectsInactive: FindObjectsInactive.Include, sortMode: FindObjectsSortMode.None);
 
             foreach (var instance in allInstances)
             {
                 if (!instance.isActiveAndEnabled)
                 {
-                    throw new InvalidOperationException(
+                    SingletonLogger.ThrowInvalidOperation(
                         message: $"[{typeof(T).Name}] Auto-create BLOCKED: inactive instance exists " +
                                  $"('{instance.name}', type: '{instance.GetType().Name}'). " +
                                  "Enable it or remove from scene."
                     );
                 }
             }
-#endif
         }
 
         private static void InvalidateInstanceCacheIfPlaySessionChanged()
@@ -276,24 +314,22 @@ namespace Singletons.Core
             {
                 if (ReferenceEquals(objA: _instance, objB: this)) return true;
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                Debug.LogWarning(
+                SingletonLogger.LogWarning(
                     message: $"[{typeof(T).Name}] Duplicate detected. Existing='{_instance.name}', destroying '{this.name}'.",
                     context: this
                 );
-#endif
+
                 Destroy(obj: this.gameObject);
                 return false;
             }
 
             if (this.GetType() != typeof(T))
             {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                Debug.LogError(
+                SingletonLogger.LogError(
                     message: $"[{typeof(T).Name}] Type mismatch. Expected='{typeof(T).Name}', Actual='{this.GetType().Name}', destroying '{this.name}'.",
                     context: this
                 );
-#endif
+
                 Destroy(obj: this.gameObject);
                 return false;
             }
@@ -301,12 +337,11 @@ namespace Singletons.Core
             var typedThis = this as T;
             if (typedThis == null)
             {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                Debug.LogError(
+                SingletonLogger.LogError(
                     message: $"[{typeof(T).Name}] Cast failure. Destroying '{this.name}'.",
                     context: this
                 );
-#endif
+
                 Destroy(obj: this.gameObject);
                 return false;
             }
@@ -322,12 +357,11 @@ namespace Singletons.Core
 
             if (this.transform.parent != null)
             {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                Debug.LogWarning(
+                SingletonLogger.LogWarning(
                     message: $"[{typeof(T).Name}] Reparented to root for DontDestroyOnLoad.",
                     context: this
                 );
-#endif
+
                 this.transform.SetParent(parent: null, worldPositionStays: true);
             }
 
