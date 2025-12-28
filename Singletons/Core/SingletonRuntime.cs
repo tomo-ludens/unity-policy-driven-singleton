@@ -78,6 +78,9 @@ namespace Singletons.Core
             return false;
         }
 
+        /// <summary>
+        /// First reliable point in Play Mode where main thread ID can be captured.
+        /// </summary>
         [RuntimeInitializeOnLoadMethod(loadType: RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void SubsystemRegistration()
         {

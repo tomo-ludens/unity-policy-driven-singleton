@@ -37,7 +37,6 @@ namespace Singletons.Core
 
         private static readonly TPolicy Policy = default;
 
-        // Per generic instantiation (T, TPolicy). Not shared across different T.
         // ReSharper disable once StaticMemberInGenericType
         private static T _instance;
 
@@ -48,7 +47,7 @@ namespace Singletons.Core
         private bool _isPersistent;
 
         /// <summary>
-        /// Returns singleton instance. Returns null during quit, from background thread, or if validation fails in release.
+        /// Returns singleton instance. In PlayMode, returns null during quit, from background thread, or if validation fails in release.
         /// </summary>
         public static T Instance
         {
@@ -79,7 +78,7 @@ namespace Singletons.Core
                 {
                     if (!candidate.isActiveAndEnabled)
                     {
-                        // In release: call stripped, returns null below.
+                        // In release: ThrowInvalidOperation call stripped, returns null below.
                         SingletonLogger.ThrowInvalidOperation(
                             message: $"Inactive/disabled instance detected.\nFound: '{candidate.name}' (type: '{candidate.GetType().Name}').\nEnable/activate it or remove it from the scene.",
                             typeTag: LogCategoryName
@@ -94,7 +93,6 @@ namespace Singletons.Core
 
                 if (!Policy.AutoCreateIfMissing)
                 {
-                    // In release: call stripped, returns null below.
                     SingletonLogger.ThrowInvalidOperation(
                         message: "No instance found and auto-creation is disabled by policy.\nPlace an active instance in the scene.",
                         typeTag: LogCategoryName
@@ -152,7 +150,6 @@ namespace Singletons.Core
             {
                 if (!candidate.isActiveAndEnabled)
                 {
-                    // In release: call stripped, returns false below.
                     SingletonLogger.ThrowInvalidOperation(
                         message: $"Inactive/disabled instance detected.\nFound: '{candidate.name}' (type: '{candidate.GetType().Name}').\nEnable/activate it or remove it from the scene.",
                         typeTag: LogCategoryName
@@ -231,7 +228,6 @@ namespace Singletons.Core
             var instance = go.AddComponent<T>();
             instance._isPersistent = Policy.PersistAcrossScenes;
 
-            // Ensure initialization even if derived Awake doesn't call base.
             instance.InitializeForCurrentPlaySessionIfNeeded();
 
             SingletonLogger.LogWarning(
@@ -266,7 +262,6 @@ namespace Singletons.Core
             return null;
         }
 
-        // In release: entire method call stripped, FindObjectsByType not executed.
         [System.Diagnostics.Conditional(conditionString: "UNITY_EDITOR"), System.Diagnostics.Conditional(conditionString: "DEVELOPMENT_BUILD")]
         private static void ThrowIfInactiveInstanceExists()
         {
