@@ -4,13 +4,18 @@
 
 MonoBehaviour 向けの **ポリシー駆動型シングルトン基底クラス**です。
 
-Unity 6.3（6000.3 系）以降での利用を想定しており、特に **Enter Play Mode Options で Reload Domain を無効化した環境**でも破綻しにくい堅牢な設計を目的としています。
-
 ## Requirements / 動作環境
 
-* **Unity 6.3** (6000.3.x) 以降
-* **Enter Play Mode Options** の **Reload Domain** を無効化した環境に完全対応
-* （任意）Reload Scene を無効化した場合でも、Play ごとに再初期化される運用を想定
+* **Unity 2021.3** 以降（Unity 6.3でテスト済み）
+* **Enter Play Mode Options** の **Reload Domain** 有効/無効の両方に対応
+* 外部依存なし
+
+## Performance Considerations / パフォーマンス考慮事項
+
+* **ポリシー解決**: ゼロアロケーション（readonly struct）
+* **インスタンスアクセス**: 自動生成時のみ最小限のアロケーション
+* **検索操作**: Unityの最適化されたFindAnyObjectByTypeを使用
+* **キャッシュ**: 頻繁なアクセス場合は参照のキャッシュを推奨
 
 ## Overview / 概要
 
@@ -329,16 +334,59 @@ Edit Mode（`Application.isPlaying == false`）では、次の挙動に固定し
 * テスト間で `PlaySessionId` が進むため、通常は static キャッシュが残っても破綻しにくい設計です。
 * ただし、テストコード側で static な購読やキャッシュを持つ場合は、テストの `TearDown` 等で解除・初期化を徹底してください。
 
-## FAQ
+## Known Limitations / 既知の制限事項
 
-**Q. `Instance` を毎フレーム呼んでも動きますか？**
-動きますが推奨しません。`Start` / `Awake` 等で取得してキャッシュしてください。
+### 静的コンストラクタのタイミング
+シングルトンクラスに静的コンストラクタがある場合、`PlaySessionId`が初期化される前に実行される可能性があります。これにより、まれに予期しない動作を引き起こすことがあります。
 
-**Q. `Awake` を書いて `base.Awake()` を呼び忘れたらどうなりますか？**
-確立処理が遅れ、最初の `Instance` / `TryGetInstance` アクセス時に初期化されます。動作はしますが、初期化タイミングが予期せず遅れるため `base` 呼び出しを徹底してください。
+### スレッドセーフティ
+すべてのシングルトン操作はメインスレッドから呼び出す必要があります。バックグラウンドスレッドからのアクセスはnull/falseを返します。
 
-**Q. シーンに置き忘れたらどうなりますか？**
-SceneSingleton は DEV/EDITOR で例外、Player では `null` / `false` です。PersistentSingleton は見つからなければ自動生成します。
+### シーン読み込み順序
+複数のシーンに同じシングルトンタイプが含まれる場合、破棄順序はUnityのシーン読み込みシーケンスに依存します。
+
+### メモリリーク
+`OnSingletonDestroy`で静的イベント購読が適切にクリーンアップされない場合、Domain Reload無効時にメモリリークが発生する可能性があります。
+
+## Troubleshooting / トラブルシューティング
+
+### FAQ
+
+**Q. Play Modeでシングルトンがnullを返す**
+コンポーネントがアクティブで有効か、メインスレッドから呼び出しているかを確認してください。Awakeをオーバーライドしている場合は`base.Awake()`の呼び出しも確認してください。
+
+**Q. 重複シングルトンの警告が出る**
+同一シングルトンが複数シーンに配置されている可能性があります。シーンおよびプレハブを確認し、重複インスタンスを削除してください。
+
+**Q. エディタでのみ例外が発生する**
+DEV/EDITORでのfail-fast動作によるものです。SceneSingletonがシーンに配置されているか確認してください。条件付きアクセスには`TryGetInstance()`を使用してください。
+
+**Q. `Instance`を毎フレーム呼んでも動きますか？**
+動作しますが推奨しません。`Start`/`Awake`で取得してキャッシュしてください。
+
+**Q. `Awake`で`base.Awake()`を呼び忘れたらどうなりますか？**
+初期化が遅延し、最初の`Instance`/`TryGetInstance`アクセス時に実行されます。動作はしますが、タイミングが予期せず遅れるため`base`呼び出しを徹底してください。
+
+**Q. SceneSingletonをシーンに置き忘れたらどうなりますか？**
+DEV/EDITORでは例外、Playerでは`null`/`false`を返します。PersistentSingletonは自動生成されます。
+
+### デバッグヒント
+
+```csharp
+// 詳細ログを有効化（DEV/EDITORのみ）
+#define DEVELOPMENT_BUILD
+#define UNITY_EDITOR
+
+// シングルトン状態を確認
+if (MySingleton.TryGetInstance(out var instance))
+{
+    Debug.Log($"シングルトン発見: {instance.name}");
+}
+else
+{
+    Debug.LogWarning("シングルトンが利用できません");
+}
+```
 
 ## References
 
