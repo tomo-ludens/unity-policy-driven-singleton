@@ -9,7 +9,7 @@ namespace Singletons.Core
     /// <remarks>
     /// <para><b>Sealed only:</b> Concrete types MUST be <c>sealed</c>; subclassing is rejected at runtime.</para>
     /// <para><b>Release builds:</b> Validations are stripped via <c>[Conditional]</c>; API returns <c>null</c>/<c>false</c> on failure.</para>
-    /// <para><b>Lifecycle:</b> Override <c>Awake</c>/<c>OnEnable</c>/<c>OnDestroy</c> MUST call base. Use <c>OnSingletonAwake</c>/<c>OnSingletonDestroy</c> for extension.</para>
+    /// <para><b>Lifecycle:</b> Override <c>Awake</c>/<c>OnEnable</c>/<c>OnDestroy</c> MUST call base (checked at runtime via OnEnable).</para>
     /// <para><b>Constraints:</b> Component must stay active+enabled. Main-thread only.</para>
     /// </remarks>
     [DisallowMultipleComponent]
@@ -30,6 +30,7 @@ namespace Singletons.Core
 
         private int _initializedPlaySessionId = UninitializedPlaySessionId;
         private bool _isPersistent;
+        private bool _baseAwakeCalled;
 
         /// <summary>
         /// Returns singleton instance. In PlayMode, returns null during quit, from background thread, or if validation fails in release.
@@ -165,6 +166,7 @@ namespace Singletons.Core
         {
             if (!Application.isPlaying) return;
 
+            _baseAwakeCalled = true;
             this.InitializeForCurrentPlaySessionIfNeeded();
         }
 
@@ -174,6 +176,15 @@ namespace Singletons.Core
         protected virtual void OnEnable()
         {
             if (!Application.isPlaying) return;
+
+            if (!_baseAwakeCalled)
+            {
+                SingletonLogger.LogError(
+                    message: $"base.Awake() was not called in {this.GetType().Name}.\nThis will prevent proper singleton initialization.\nMake sure to call base.Awake() at the beginning of your Awake() method.",
+                    typeTag: LogCategoryName,
+                    context: this
+                );
+            }
 
             this.InitializeForCurrentPlaySessionIfNeeded();
         }
@@ -186,18 +197,7 @@ namespace Singletons.Core
             if (!ReferenceEquals(objA: _instance, objB: this)) return;
 
             _instance = null;
-            this.OnSingletonDestroy();
         }
-
-        /// <summary>
-        /// Called once per Play session after singleton established.
-        /// </summary>
-        protected virtual void OnSingletonAwake() { }
-
-        /// <summary>
-        /// Called when THIS instance is destroyed as the singleton. NOT called for destroyed duplicates.
-        /// </summary>
-        protected virtual void OnSingletonDestroy() { }
 
         private static T CreateInstance()
         {
@@ -278,7 +278,6 @@ namespace Singletons.Core
 
             this.EnsurePersistent();
             this._initializedPlaySessionId = currentPlaySessionId;
-            this.OnSingletonAwake();
         }
 
         private bool TryEstablishAsInstance()
@@ -318,15 +317,5 @@ namespace Singletons.Core
             this._isPersistent = true;
         }
 
-#if UNITY_INCLUDE_TESTS
-        /// <summary>
-        /// Test-only: Resets static cache for this singleton type.
-        /// </summary>
-        internal static void ResetStaticCacheForTesting()
-        {
-            _instance = null;
-            _cachedPlaySessionId = UninitializedPlaySessionId;
-        }
-#endif
     }
 }

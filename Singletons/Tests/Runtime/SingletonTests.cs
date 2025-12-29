@@ -1,6 +1,5 @@
 using System.Collections;
 using NUnit.Framework;
-using Singletons.Core;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -12,8 +11,9 @@ namespace Singletons.Tests.Runtime
     {
         public int AwakeCount { get; private set; }
 
-        protected override void OnSingletonAwake()
+        protected override void Awake()
         {
+            base.Awake();
             AwakeCount++;
         }
     }
@@ -22,8 +22,9 @@ namespace Singletons.Tests.Runtime
     {
         public bool WasInitialized { get; private set; }
 
-        protected override void OnSingletonAwake()
+        protected override void Awake()
         {
+            base.Awake();
             WasInitialized = true;
         }
     }
@@ -56,8 +57,7 @@ namespace Singletons.Tests.Runtime
                 Object.DestroyImmediate(obj: instance.gameObject);
             }
 
-            TestPersistentSingleton.ResetStaticCacheForTesting();
-            SingletonRuntime.ResetQuittingFlagForTesting();
+            default(TestPersistentSingleton).ResetStaticCacheForTesting();
         }
 
         [UnityTest]
@@ -67,7 +67,7 @@ namespace Singletons.Tests.Runtime
             yield return null;
 
             Assert.IsNotNull(anObject: instance, message: "Instance should be auto-created");
-            Assert.AreEqual(expected: 1, actual: instance.AwakeCount, message: "OnSingletonAwake should be called once");
+            Assert.AreEqual(expected: 1, actual: instance.AwakeCount, message: "Awake should be called once");
         }
 
         [UnityTest]
@@ -80,7 +80,7 @@ namespace Singletons.Tests.Runtime
             yield return null;
 
             Assert.AreSame(expected: first, actual: second, message: "Multiple accesses should return the same instance");
-            Assert.AreEqual(expected: 1, actual: first.AwakeCount, message: "OnSingletonAwake should be called only once");
+            Assert.AreEqual(expected: 1, actual: first.AwakeCount, message: "Awake should be called only once");
         }
 
         [UnityTest]
@@ -116,33 +116,7 @@ namespace Singletons.Tests.Runtime
             Assert.IsFalse(condition: exists, message: "TryGetInstance should not auto-create");
         }
 
-        [UnityTest]
-        public IEnumerator Instance_ReturnsNull_WhenQuitting()
-        {
-            var _ = TestPersistentSingleton.Instance;
-            yield return null;
 
-            SingletonRuntime.SimulateQuittingForTesting();
-            TestPersistentSingleton.ResetStaticCacheForTesting();
-
-            var instance = TestPersistentSingleton.Instance;
-
-            Assert.IsNull(anObject: instance, message: "Instance should return null during quit");
-        }
-
-        [UnityTest]
-        public IEnumerator TryGetInstance_ReturnsFalse_WhenQuitting()
-        {
-            var _ = TestPersistentSingleton.Instance;
-            yield return null;
-
-            SingletonRuntime.SimulateQuittingForTesting();
-
-            var result = TestPersistentSingleton.TryGetInstance(instance: out var instance);
-
-            Assert.IsFalse(condition: result, message: "TryGetInstance should return false during quit");
-            Assert.IsNull(anObject: instance, message: "Instance should be null during quit");
-        }
 
         [UnityTest]
         public IEnumerator Duplicate_IsDestroyed()
@@ -158,21 +132,6 @@ namespace Singletons.Tests.Runtime
             Assert.AreEqual(expected: 1, actual: Object.FindObjectsByType<TestPersistentSingleton>(sortMode: FindObjectsSortMode.None).Length, message: "Only one instance should exist");
         }
 
-        [UnityTest]
-        public IEnumerator PlaySessionChange_InvalidatesCache_AndRerunsOnSingletonAwake()
-        {
-            var instance = TestPersistentSingleton.Instance;
-            Assert.AreEqual(expected: 1, actual: instance.AwakeCount);
-            yield return null;
-
-            SingletonRuntime.AdvancePlaySessionForTesting();
-
-            var sameInstance = TestPersistentSingleton.Instance;
-            yield return null;
-
-            Assert.AreSame(expected: instance, actual: sameInstance, message: "Should return the same GameObject instance");
-            Assert.AreEqual(expected: 2, actual: instance.AwakeCount, message: "OnSingletonAwake should be called again after session change");
-        }
 
         [UnityTest]
         public IEnumerator Instance_HasDontDestroyOnLoad()
@@ -198,8 +157,7 @@ namespace Singletons.Tests.Runtime
                 Object.DestroyImmediate(obj: instance.gameObject);
             }
 
-            TestSceneSingleton.ResetStaticCacheForTesting();
-            SingletonRuntime.ResetQuittingFlagForTesting();
+            default(TestSceneSingleton).ResetStaticCacheForTesting();
         }
 
         [UnityTest]
@@ -212,7 +170,7 @@ namespace Singletons.Tests.Runtime
             var instance = TestSceneSingleton.Instance;
 
             Assert.AreSame(expected: placed, actual: instance, message: "Should return the placed instance");
-            Assert.IsTrue(condition: instance.WasInitialized, message: "OnSingletonAwake should be called");
+            Assert.IsTrue(condition: instance.WasInitialized, message: "Awake should be called");
         }
 
         [UnityTest]
@@ -266,41 +224,6 @@ namespace Singletons.Tests.Runtime
         }
     }
 
-    [TestFixture]
-    public class SingletonRuntimeTests
-    {
-        [TearDown]
-        public void TearDown()
-        {
-            SingletonRuntime.ResetQuittingFlagForTesting();
-        }
-
-        [Test]
-        public void IsQuitting_IsFalse_Initially()
-        {
-            SingletonRuntime.ResetQuittingFlagForTesting();
-
-            Assert.IsFalse(condition: SingletonRuntime.IsQuitting, message: "IsQuitting should be false initially");
-        }
-
-        [Test]
-        public void SimulateQuitting_SetsIsQuittingTrue()
-        {
-            SingletonRuntime.SimulateQuittingForTesting();
-
-            Assert.IsTrue(condition: SingletonRuntime.IsQuitting, message: "IsQuitting should be true after simulating quit");
-        }
-
-        [Test]
-        public void AdvancePlaySession_IncrementsPlaySessionId()
-        {
-            var before = SingletonRuntime.PlaySessionId;
-
-            SingletonRuntime.AdvancePlaySessionForTesting();
-
-            Assert.AreEqual(expected: before + 1, actual: SingletonRuntime.PlaySessionId, message: "PlaySessionId should increment");
-        }
-    }
 
     [TestFixture]
     public class InactiveInstanceTests
@@ -315,8 +238,7 @@ namespace Singletons.Tests.Runtime
                 Object.DestroyImmediate(obj: instance.gameObject);
             }
 
-            TestInactiveSingleton.ResetStaticCacheForTesting();
-            SingletonRuntime.ResetQuittingFlagForTesting();
+            default(TestInactiveSingleton).ResetStaticCacheForTesting();
         }
 
         [UnityTest]
@@ -328,7 +250,7 @@ namespace Singletons.Tests.Runtime
             go.SetActive(value: false);
 
             // Reset cache to force fresh search
-            TestInactiveSingleton.ResetStaticCacheForTesting();
+            default(TestInactiveSingleton).ResetStaticCacheForTesting();
             yield return null;
 
             // Singleton behavior: ThrowIfInactiveInstanceExists() checks with Include
@@ -350,7 +272,7 @@ namespace Singletons.Tests.Runtime
             go.SetActive(value: false);
 
             // Reset cache to force fresh search
-            TestInactiveSingleton.ResetStaticCacheForTesting();
+            default(TestInactiveSingleton).ResetStaticCacheForTesting();
             yield return null;
 
             // With Exclude policy, inactive GO is not found
@@ -370,7 +292,7 @@ namespace Singletons.Tests.Runtime
 
             // Disable the component after initialization
             comp.enabled = false;
-            TestInactiveSingleton.ResetStaticCacheForTesting();
+            default(TestInactiveSingleton).ResetStaticCacheForTesting();
             yield return null;
 
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -395,8 +317,7 @@ namespace Singletons.Tests.Runtime
                 Object.DestroyImmediate(obj: instance.gameObject);
             }
 
-            TestBaseSingleton.ResetStaticCacheForTesting();
-            SingletonRuntime.ResetQuittingFlagForTesting();
+            default(TestBaseSingleton).ResetStaticCacheForTesting();
         }
 
         [UnityTest]
@@ -444,8 +365,7 @@ namespace Singletons.Tests.Runtime
                 Object.DestroyImmediate(obj: instance.gameObject);
             }
 
-            TestPersistentSingleton.ResetStaticCacheForTesting();
-            SingletonRuntime.ResetQuittingFlagForTesting();
+            default(TestPersistentSingleton).ResetStaticCacheForTesting();
         }
 
         [UnityTest]
@@ -530,12 +450,11 @@ namespace Singletons.Tests.Runtime
                 Object.DestroyImmediate(obj: instance.gameObject);
             }
 
-            TestPersistentSingleton.ResetStaticCacheForTesting();
-            SingletonRuntime.ResetQuittingFlagForTesting();
+            default(TestPersistentSingleton).ResetStaticCacheForTesting();
         }
 
         [UnityTest]
-        public IEnumerator OnSingletonDestroy_CalledWhenDestroyed()
+        public IEnumerator OnDestroy_CleansUpInstance()
         {
             var instance = TestPersistentSingleton.Instance;
             yield return null;
@@ -555,7 +474,7 @@ namespace Singletons.Tests.Runtime
             yield return null;
 
             Object.DestroyImmediate(obj: first.gameObject);
-            TestPersistentSingleton.ResetStaticCacheForTesting();
+            default(TestPersistentSingleton).ResetStaticCacheForTesting();
             yield return null;
 
             var second = TestPersistentSingleton.Instance;
@@ -566,22 +485,6 @@ namespace Singletons.Tests.Runtime
             Assert.AreEqual(expected: 1, actual: second.AwakeCount, message: "New instance should have fresh AwakeCount");
         }
 
-        [UnityTest]
-        public IEnumerator MultiplePlaySessions_ResetState()
-        {
-            var instance = TestPersistentSingleton.Instance;
-            Assert.AreEqual(expected: 1, actual: instance.AwakeCount);
-            yield return null;
-
-            // Simulate multiple play sessions
-            for (int i = 0; i < 3; i++)
-            {
-                SingletonRuntime.AdvancePlaySessionForTesting();
-                _ = TestPersistentSingleton.Instance;
-            }
-
-            Assert.AreEqual(expected: 4, actual: instance.AwakeCount, message: "OnSingletonAwake should be called for each session");
-        }
     }
 
     [TestFixture]
@@ -595,8 +498,7 @@ namespace Singletons.Tests.Runtime
                 Object.DestroyImmediate(obj: instance.gameObject);
             }
 
-            TestSceneSingleton.ResetStaticCacheForTesting();
-            SingletonRuntime.ResetQuittingFlagForTesting();
+            default(TestSceneSingleton).ResetStaticCacheForTesting();
         }
 
         [UnityTest]
@@ -622,6 +524,257 @@ namespace Singletons.Tests.Runtime
 
             Assert.IsNull(anObject: before, message: "Should not exist before");
             Assert.IsNull(anObject: after, message: "Should still not exist - no auto-creation");
+        }
+    }
+
+    /// <summary>
+    /// GameManager-like persistent singleton for practical usage testing
+    /// </summary>
+    public sealed class GameManager : PersistentSingletonBehaviour<GameManager>
+    {
+        public int PlayerScore { get; private set; }
+        public string CurrentLevel { get; private set; }
+        public bool IsGamePaused { get; private set; }
+
+        protected override void Awake()
+        {
+            base.Awake();
+            PlayerScore = 0;
+            CurrentLevel = "MainMenu";
+            IsGamePaused = false;
+        }
+
+        public void AddScore(int points)
+        {
+            PlayerScore += points;
+        }
+
+        public void SetLevel(string levelName)
+        {
+            CurrentLevel = levelName;
+        }
+
+        public void PauseGame()
+        {
+            IsGamePaused = true;
+        }
+
+        public void ResumeGame()
+        {
+            IsGamePaused = false;
+        }
+    }
+
+    /// <summary>
+    /// LevelController-like scene singleton for practical usage testing
+    /// </summary>
+    public sealed class LevelController : SceneSingletonBehaviour<LevelController>
+    {
+        public string LevelName { get; private set; }
+        public int EnemyCount { get; private set; }
+        public bool IsLevelComplete { get; private set; }
+
+        protected override void Awake()
+        {
+            base.Awake();
+            LevelName = "DefaultLevel";
+            EnemyCount = 5;
+            IsLevelComplete = false;
+        }
+
+        public void SetLevelInfo(string levelName, int enemies)
+        {
+            LevelName = levelName;
+            EnemyCount = enemies;
+        }
+
+        public void CompleteLevel()
+        {
+            IsLevelComplete = true;
+        }
+    }
+
+    [TestFixture]
+    public class PracticalUsageTests
+    {
+        [TearDown]
+        public void TearDown()
+        {
+            // Clean up GameManager
+            if (GameManager.TryGetInstance(instance: out var gm))
+            {
+                Object.DestroyImmediate(obj: gm.gameObject);
+            }
+            default(GameManager).ResetStaticCacheForTesting();
+
+            // Clean up LevelController
+            if (LevelController.TryGetInstance(instance: out var lc))
+            {
+                Object.DestroyImmediate(obj: lc.gameObject);
+            }
+            default(LevelController).ResetStaticCacheForTesting();
+        }
+
+        [UnityTest]
+        public IEnumerator GameManager_PersistsAcrossAccess()
+        {
+            // First access should create instance
+            var gm1 = GameManager.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: gm1, message: "GameManager should be created");
+            Assert.AreEqual(expected: 0, actual: gm1.PlayerScore, message: "Initial score should be 0");
+            Assert.AreEqual(expected: "MainMenu", actual: gm1.CurrentLevel, message: "Initial level should be MainMenu");
+
+            // Modify state
+            gm1.AddScore(points: 100);
+            gm1.SetLevel(levelName: "Level1");
+            gm1.PauseGame();
+
+            // Second access should return same instance
+            var gm2 = GameManager.Instance;
+            yield return null;
+
+            Assert.AreSame(expected: gm1, actual: gm2, message: "Should return same instance");
+            Assert.AreEqual(expected: 100, actual: gm2.PlayerScore, message: "Score should persist");
+            Assert.AreEqual(expected: "Level1", actual: gm2.CurrentLevel, message: "Level should persist");
+            Assert.IsTrue(condition: gm2.IsGamePaused, message: "Pause state should persist");
+        }
+
+        [UnityTest]
+        public IEnumerator LevelController_RequiresPlacement()
+        {
+            // Without placement, should return null
+            var result = LevelController.TryGetInstance(instance: out var controller);
+            yield return null;
+
+            Assert.IsFalse(condition: result, message: "Should return false when not placed");
+            Assert.IsNull(anObject: controller, message: "Controller should be null");
+
+            // Place in scene
+            var go = new GameObject(name: "LevelController");
+            var placedController = go.AddComponent<LevelController>();
+            yield return null;
+
+            // Now should work
+            var result2 = LevelController.TryGetInstance(instance: out var controller2);
+            yield return null;
+
+            Assert.IsTrue(condition: result2, message: "Should return true when placed");
+            Assert.AreSame(expected: placedController, actual: controller2, message: "Should return placed instance");
+            Assert.AreEqual(expected: "DefaultLevel", actual: controller2.LevelName, message: "Should be initialized");
+        }
+
+        [UnityTest]
+        public IEnumerator Singleton_StateManagement_WorksCorrectly()
+        {
+            // Test GameManager state management
+            var gm = GameManager.Instance;
+            yield return null;
+
+            // Initial state
+            Assert.AreEqual(expected: 0, actual: gm.PlayerScore);
+            Assert.AreEqual(expected: "MainMenu", actual: gm.CurrentLevel);
+            Assert.IsFalse(condition: gm.IsGamePaused);
+
+            // Modify state like a real game
+            gm.AddScore(points: 500);
+            gm.SetLevel(levelName: "BossLevel");
+            gm.PauseGame();
+
+            // Verify state changes
+            Assert.AreEqual(expected: 500, actual: gm.PlayerScore);
+            Assert.AreEqual(expected: "BossLevel", actual: gm.CurrentLevel);
+            Assert.IsTrue(condition: gm.IsGamePaused);
+
+            // Resume and continue
+            gm.AddScore(points: 1000);
+            gm.SetLevel(levelName: "Victory");
+            gm.ResumeGame();
+
+            Assert.AreEqual(expected: 1500, actual: gm.PlayerScore);
+            Assert.AreEqual(expected: "Victory", actual: gm.CurrentLevel);
+            Assert.IsFalse(condition: gm.IsGamePaused);
+        }
+
+        [UnityTest]
+        public IEnumerator SceneSingleton_LevelManagement_WorksCorrectly()
+        {
+            // Create and place LevelController
+            var go = new GameObject(name: "LevelController");
+            var controller = go.AddComponent<LevelController>();
+            yield return null;
+
+            // Initial state
+            Assert.AreEqual(expected: "DefaultLevel", actual: controller.LevelName);
+            Assert.AreEqual(expected: 5, actual: controller.EnemyCount);
+            Assert.IsFalse(condition: controller.IsLevelComplete);
+
+            // Simulate level progression
+            controller.SetLevelInfo(levelName: "CastleLevel", enemies: 10);
+
+            // Simulate gameplay - defeat all enemies
+            controller.SetLevelInfo(levelName: "CastleLevel", enemies: 0);
+
+            // Complete level
+            controller.CompleteLevel();
+
+            Assert.AreEqual(expected: "CastleLevel", actual: controller.LevelName);
+            Assert.AreEqual(expected: 0, actual: controller.EnemyCount);
+            Assert.IsTrue(condition: controller.IsLevelComplete);
+        }
+
+        [UnityTest]
+        public IEnumerator Singleton_InitializationOrder_WorksCorrectly()
+        {
+            // Create multiple singletons to test initialization order
+            var gm = GameManager.Instance;
+            yield return null;
+
+            // Place level controller
+            var go = new GameObject(name: "LevelController");
+            var lc = go.AddComponent<LevelController>();
+            yield return null;
+
+            // Both should be properly initialized
+            Assert.IsNotNull(anObject: gm);
+            Assert.IsNotNull(anObject: lc);
+            Assert.AreEqual(expected: 0, actual: gm.PlayerScore);
+            Assert.AreEqual(expected: "DefaultLevel", actual: lc.LevelName);
+
+            // Modify both
+            gm.AddScore(points: 100);
+            lc.SetLevelInfo(levelName: "OrderedLevel", enemies: 3);
+
+            // Verify both maintain state
+            Assert.AreEqual(expected: 100, actual: gm.PlayerScore);
+            Assert.AreEqual(expected: "OrderedLevel", actual: lc.LevelName);
+            Assert.AreEqual(expected: 3, actual: lc.EnemyCount);
+        }
+
+        [UnityTest]
+        public IEnumerator Singleton_ResourceManagement_WorksCorrectly()
+        {
+            // Test proper cleanup on destroy
+            var gm = GameManager.Instance;
+            yield return null;
+
+            // Set up some state
+            gm.AddScore(points: 999);
+            gm.SetLevel(levelName: "FinalLevel");
+
+            // Destroy instance (simulate scene unload for persistent singleton)
+            Object.DestroyImmediate(obj: gm.gameObject);
+            yield return null;
+
+            // Next access should create new instance with fresh state
+            var gm2 = GameManager.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: gm2);
+            Assert.AreNotSame(expected: gm, actual: gm2, message: "Should be different instance");
+            Assert.AreEqual(expected: 0, actual: gm2.PlayerScore, message: "Should have fresh score");
+            Assert.AreEqual(expected: "MainMenu", actual: gm2.CurrentLevel, message: "Should have fresh level");
         }
     }
 }

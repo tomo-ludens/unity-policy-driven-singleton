@@ -37,7 +37,7 @@ They share the same core logic, while a **policy** controls the lifecycle behavi
 * **Safe lifecycle**:
   * **Quitting**: Considers `Application.quitting` and prevents creation/access during shutdown.
   * **Edit Mode**: Performs *lookup only* in the editor, and does not create instances or mutate static caches (no side effects).
-  * **Reinitialization (Soft Reset)**: Performs state reset at the **Play-session boundary** and runs `OnSingletonAwake()` every Play session (aligned with the `PlaySessionId` strategy).
+  * **Reinitialization (Soft Reset)**: Performs state reset at the **Play-session boundary** and reinitializes every Play session (aligned with the `PlaySessionId` strategy).
 * **Strict type checks**: Rejects references where the generic type `T` does not exactly match the concrete runtime type, preventing misuse.
 * **Development safety (DEV/EDITOR)**:
   * `FindAnyObjectByType(...Exclude)` does **not** consider inactive objects, so an inactive singleton can be treated as "missing" → auto-created → silently duplicated. To prevent this, DEV/EDITOR uses **fail-fast** (throws) when an inactive singleton is detected.
@@ -99,16 +99,10 @@ public sealed class GameManager : PersistentSingletonBehaviour<GameManager>
 {
     public int Score { get; private set; }
 
-    // Use OnSingletonAwake instead of Awake.
-    protected override void OnSingletonAwake()
+    protected override void Awake()
     {
-        // Initialization that runs once per Play session
+        base.Awake(); // Required - initializes singleton
         Score = 0;
-    }
-
-    protected override void OnSingletonDestroy()
-    {
-        // Called only when the actual instance is destroyed
     }
 
     public void AddScore(int value) => Score += value;
@@ -127,8 +121,9 @@ using Singletons;
 
 public sealed class LevelController : SceneSingletonBehaviour<LevelController>
 {
-    protected override void OnSingletonAwake()
+    protected override void Awake()
     {
+        base.Awake(); // Required - initializes singleton
         // Per-scene initialization
     }
 }
@@ -278,7 +273,7 @@ protected override void Awake()
 }
 ```
 
-Even if you forget, there is a safety net that initializes on the first `Instance` / `TryGetInstance` access. However, that obscures ordering and is not recommended. Prefer `OnSingletonAwake` / `OnSingletonDestroy`.
+Even if you forget, there is a safety net that initializes on the first `Instance` / `TryGetInstance` access. However, that obscures ordering and is not recommended. Always call `base.Awake()` at the beginning of your overridden `Awake()` method.
 
 ### 3. Placement guidelines
 
@@ -290,9 +285,9 @@ Even if you forget, there is a safety net that initializes on the first `Instanc
 
 ### Soft Reset (per-Play reinitialization)
 
-With Domain Reload disabled, static state can persist. This library invalidates caches at the Play-session boundary (`PlaySessionId`) and runs `OnSingletonAwake()` every Play session to reset state.
+With Domain Reload disabled, static state can persist. This library invalidates caches at the Play-session boundary (`PlaySessionId`) and reinitializes every Play session to reset state.
 
-Write `OnSingletonAwake()` to be **idempotent** (e.g., "unsubscribe → subscribe" for event hookups).
+Write your `Awake()` initialization to be **idempotent** (e.g., "unsubscribe → subscribe" for event hookups).
 
 ### Threading / Main Thread
 
@@ -344,15 +339,15 @@ This package includes PlayMode and EditMode tests:
 
 | Category | Tests | Coverage |
 |----------|-------|----------|
-| PersistentSingleton | 10 | Auto-creation, caching, quitting, duplicates |
+| PersistentSingleton | 7 | Auto-creation, caching, duplicates |
 | SceneSingleton | 5 | Placement, no auto-create, duplicates |
-| SingletonRuntime | 3 | PlaySessionId, IsQuitting |
 | InactiveInstance | 3 | Inactive GO detection, disabled component |
 | TypeMismatch | 2 | Derived class rejection |
 | ThreadSafety | 2 | Background thread protection |
-| Lifecycle | 3 | Destruction, recreation, multi-session |
+| Lifecycle | 2 | Destruction, recreation |
 | SceneSingletonEdgeCases | 2 | Not placed, no auto-create |
-| **EditMode** | 4 | SingletonRuntime in Edit Mode |
+| PracticalUsage | 6 | GameManager, LevelController, state management |
+| **EditMode** | 1 | PlaySessionId accessibility |
 
 ### Running Tests
 
@@ -362,20 +357,11 @@ This package includes PlayMode and EditMode tests:
 
 ### Writing Your Own Tests
 
-Test-only APIs are available under `#if UNITY_INCLUDE_TESTS`:
+Test-only APIs are available via `TestExtensions`:
 
 ```csharp
-// Reset static instance cache
-MyManager.ResetStaticCacheForTesting();
-
-// Simulate quitting
-SingletonRuntime.SimulateQuittingForTesting();
-
-// Reset quitting flag
-SingletonRuntime.ResetQuittingFlagForTesting();
-
-// Advance PlaySessionId
-SingletonRuntime.AdvancePlaySessionForTesting();
+// Reset static instance cache (uses reflection)
+default(MyManager).ResetStaticCacheForTesting();
 ```
 
 **Example Test:**
@@ -386,7 +372,7 @@ public IEnumerator MyManager_AutoCreates()
 {
     var instance = MyManager.Instance;
     yield return null;
-    
+
     Assert.IsNotNull(instance);
 }
 
@@ -397,8 +383,7 @@ public void TearDown()
     {
         Object.DestroyImmediate(instance.gameObject);
     }
-    MyManager.ResetStaticCacheForTesting();
-    SingletonRuntime.ResetQuittingFlagForTesting();
+    default(MyManager).ResetStaticCacheForTesting();
 }
 ```
 
@@ -420,7 +405,7 @@ All singleton operations must be called from the main thread. Access from backgr
 If multiple scenes contain the same singleton type, the destruction order depends on Unity's scene loading sequence.
 
 ### Memory Leaks
-If static event subscriptions are not properly cleaned up in `OnSingletonDestroy`, memory leaks can occur when Domain Reload is disabled.
+If static event subscriptions are not properly cleaned up in `OnDestroy`, memory leaks can occur when Domain Reload is disabled.
 
 ## Troubleshooting
 
