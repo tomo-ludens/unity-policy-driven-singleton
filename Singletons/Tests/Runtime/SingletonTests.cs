@@ -86,7 +86,7 @@ namespace Singletons.Tests.Runtime
         [UnityTest]
         public IEnumerator TryGetInstance_ReturnsFalse_WhenNotExists()
         {
-            var result = TestPersistentSingleton.TryGetInstance(instance: out var instance);
+            bool result = TestPersistentSingleton.TryGetInstance(instance: out var instance);
             yield return null;
 
             Assert.IsFalse(condition: result, message: "TryGetInstance should return false when no instance exists");
@@ -99,7 +99,7 @@ namespace Singletons.Tests.Runtime
             var created = TestPersistentSingleton.Instance;
             yield return null;
 
-            var result = TestPersistentSingleton.TryGetInstance(instance: out var instance);
+            bool result = TestPersistentSingleton.TryGetInstance(instance: out var instance);
 
             Assert.IsTrue(condition: result, message: "TryGetInstance should return true when instance exists");
             Assert.AreSame(expected: created, actual: instance, message: "Should return the same instance");
@@ -111,7 +111,7 @@ namespace Singletons.Tests.Runtime
             TestPersistentSingleton.TryGetInstance(instance: out _);
             yield return null;
 
-            var exists = TestPersistentSingleton.TryGetInstance(instance: out _);
+            bool exists = TestPersistentSingleton.TryGetInstance(instance: out _);
 
             Assert.IsFalse(condition: exists, message: "TryGetInstance should not auto-create");
         }
@@ -176,7 +176,7 @@ namespace Singletons.Tests.Runtime
         [UnityTest]
         public IEnumerator TryGetInstance_ReturnsFalse_WhenNotPlaced()
         {
-            var result = TestSceneSingleton.TryGetInstance(instance: out var instance);
+            bool result = TestSceneSingleton.TryGetInstance(instance: out var instance);
             yield return null;
 
             Assert.IsFalse(condition: result, message: "TryGetInstance should return false when not placed");
@@ -190,7 +190,7 @@ namespace Singletons.Tests.Runtime
             go.AddComponent<TestSceneSingleton>();
             yield return null;
 
-            var result = TestSceneSingleton.TryGetInstance(instance: out var instance);
+            bool result = TestSceneSingleton.TryGetInstance(instance: out var instance);
 
             Assert.IsTrue(condition: result, message: "TryGetInstance should return true when placed");
             Assert.IsNotNull(anObject: instance, message: "Instance should not be null");
@@ -276,7 +276,7 @@ namespace Singletons.Tests.Runtime
             yield return null;
 
             // With Exclude policy, inactive GO is not found
-            var result = TestInactiveSingleton.TryGetInstance(instance: out var instance);
+            bool result = TestInactiveSingleton.TryGetInstance(instance: out var instance);
 
             Assert.IsFalse(condition: result, message: "TryGetInstance should return false when only inactive exists");
             Assert.IsNull(anObject: instance, message: "Instance should be null");
@@ -405,7 +405,7 @@ namespace Singletons.Tests.Runtime
         [UnityTest]
         public IEnumerator BackgroundThread_TryGetInstance_ThrowsUnityException()
         {
-            var _ = TestPersistentSingleton.Instance;
+            _ = TestPersistentSingleton.Instance;
             yield return null;
 
             System.Exception threadException = null;
@@ -437,6 +437,127 @@ namespace Singletons.Tests.Runtime
             Assert.IsNotNull(anObject: threadException, message: "Should throw exception from background thread");
             Assert.IsInstanceOf<UnityException>(actual: threadException, message: "Should be UnityException for main-thread-only API");
         }
+
+        [UnityTest]
+        public IEnumerator MainThread_Instance_AccessIsSafe()
+        {
+            // Verify that main thread access works correctly and safely
+            System.Exception mainThreadException = null;
+            TestPersistentSingleton instance = null;
+
+            try
+            {
+                instance = TestPersistentSingleton.Instance;
+            }
+            catch (System.Exception ex)
+            {
+                mainThreadException = ex;
+            }
+
+            Assert.IsNull(anObject: mainThreadException, message: "No exception should be thrown on main thread");
+            Assert.IsNotNull(anObject: instance, message: "Instance should be created successfully on main thread");
+            Assert.IsInstanceOf<TestPersistentSingleton>(actual: instance, message: "Should return correct type");
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator MainThread_TryGetInstance_AccessIsSafe()
+        {
+            // Verify TryGetInstance works safely on main thread
+
+            // First create an instance
+            var createdInstance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            // Now TryGetInstance should find it safely on main thread
+            bool result = TestPersistentSingleton.TryGetInstance(instance: out var instance);
+
+            Assert.IsTrue(condition: result, message: "TryGetInstance should return true after creation");
+            Assert.IsNotNull(anObject: instance, message: "Instance should be retrieved successfully");
+            Assert.AreSame(expected: createdInstance, actual: instance, message: "Should return the same instance");
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ThreadSafety_Isolation_BetweenOperations()
+        {
+            // Test that main thread operations work correctly and are isolated from thread safety issues
+            var firstInstance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: firstInstance, message: "Should create instance on main thread");
+
+            // Multiple Instance calls should be safe and return same instance
+            for (int i = 0; i < 5; i++)
+            {
+                var instance = TestPersistentSingleton.Instance;
+                Assert.AreSame(expected: firstInstance, actual: instance, message: $"Instance call {i} should return same instance on main thread");
+                yield return null;
+            }
+
+            // TryGetInstance should also work safely
+            bool tryResult = TestPersistentSingleton.TryGetInstance(instance: out var tryInstance);
+            Assert.IsTrue(condition: tryResult, message: "TryGetInstance should succeed on main thread");
+            Assert.AreSame(expected: firstInstance, actual: tryInstance, message: "TryGetInstance should return same instance");
+        }
+
+        [UnityTest]
+        public IEnumerator ThreadSafety_ValidationLayer_PreventsBackgroundAccess()
+        {
+            // Test that the thread safety validation layer properly prevents background thread access
+            System.Exception threadException = null;
+            bool threadCompleted = false;
+
+            var thread = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    // This should trigger the main thread validation
+                    _ = TestPersistentSingleton.Instance;
+                }
+                catch (System.Exception ex)
+                {
+                    threadException = ex;
+                }
+                finally
+                {
+                    threadCompleted = true;
+                }
+            });
+
+            thread.Start();
+
+            while (!threadCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.IsNotNull(anObject: threadException, message: "Background thread access should be blocked");
+            Assert.IsTrue(
+                condition: threadException.Message.Contains(value: "main thread") || threadException.Message.Contains(value: "UnityException") || threadException.GetType() == typeof(UnityException),
+                message: "Exception should indicate main thread requirement"
+                );
+        }
+
+        [Test]
+        public void ThreadSafety_MainThreadValidation_DoesNotInterfere()
+        {
+            // Test that main thread validation doesn't interfere with normal operations
+            Assert.DoesNotThrow(() =>
+            {
+                var instance = TestPersistentSingleton.Instance;
+                Assert.IsNotNull(anObject: instance, message: "Instance creation should work on main thread");
+            }, message: "Instance access should not throw on main thread");
+
+            Assert.DoesNotThrow(() =>
+            {
+                bool result = TestPersistentSingleton.TryGetInstance(instance: out var instance);
+                Assert.IsTrue(condition: result, message: "TryGetInstance should succeed");
+                Assert.IsNotNull(anObject: instance, message: "Instance should be retrieved");
+            }, message: "TryGetInstance should not throw on main thread");
+        }
     }
 
     [TestFixture]
@@ -463,7 +584,7 @@ namespace Singletons.Tests.Runtime
             yield return null;
 
             // After destruction, TryGetInstance should return false
-            var exists = TestPersistentSingleton.TryGetInstance(instance: out _);
+            bool exists = TestPersistentSingleton.TryGetInstance(instance: out _);
             Assert.IsFalse(condition: exists, message: "Instance should not exist after destruction");
         }
 
@@ -595,6 +716,164 @@ namespace Singletons.Tests.Runtime
     }
 
     [TestFixture]
+    public class PolicyBehaviorTests
+    {
+        [TearDown]
+        public void TearDown()
+        {
+            // Clean up any created instances
+            if (TestPersistentSingleton.TryGetInstance(instance: out var persistent))
+            {
+                Object.DestroyImmediate(obj: persistent.gameObject);
+            }
+            if (TestSceneSingleton.TryGetInstance(instance: out var scene))
+            {
+                Object.DestroyImmediate(obj: scene.gameObject);
+            }
+
+            default(TestPersistentSingleton).ResetStaticCacheForTesting();
+            default(TestSceneSingleton).ResetStaticCacheForTesting();
+        }
+
+        [UnityTest]
+        public IEnumerator PersistentPolicy_EnablesAutoCreation()
+        {
+            // Access Instance - should auto-create due to PersistentPolicy
+            var instance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: instance, message: "PersistentPolicy should enable auto-creation");
+            Assert.AreEqual(expected: "TestPersistentSingleton", actual: instance.gameObject.name, message: "Auto-created object should have correct name");
+        }
+
+        [UnityTest]
+        public IEnumerator ScenePolicy_DisablesAutoCreation()
+        {
+            // Try to access Instance when not placed - should throw exception due to ScenePolicy
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Assert.Throws<System.InvalidOperationException>(() => { _ = TestSceneSingleton.Instance; },
+                message: "ScenePolicy should throw exception when not placed (DEV/EDITOR)");
+#else
+            var instance = TestSceneSingleton.Instance;
+            Assert.IsNull(instance, message: "ScenePolicy should return null when not placed (Release)");
+#endif
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PersistentSingleton_SurvivesDontDestroyOnLoad()
+        {
+            var instance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            // Check if DontDestroyOnLoad was applied
+            Assert.IsTrue(
+                condition: instance.gameObject.scene.name == "DontDestroyOnLoad" || instance.transform.parent == null,
+                message: "Persistent singleton should be in DontDestroyOnLoad scene or root"
+            );
+
+            // Verify it's still accessible after scene operations
+            var sameInstance = TestPersistentSingleton.Instance;
+            Assert.AreSame(expected: instance, actual: sameInstance, message: "Should return the same instance after DontDestroyOnLoad");
+        }
+    }
+
+    [TestFixture]
+    public class ErrorRecoveryTests
+    {
+        [TearDown]
+        public void TearDown()
+        {
+            // Clean up any created instances
+            if (TestPersistentSingleton.TryGetInstance(instance: out var instance))
+            {
+                Object.DestroyImmediate(obj: instance.gameObject);
+            }
+            default(TestPersistentSingleton).ResetStaticCacheForTesting();
+        }
+
+    }
+
+    [TestFixture]
+    public class ResourceManagementTests
+    {
+        [TearDown]
+        public void TearDown()
+        {
+            // Clean up any created instances
+            if (TestPersistentSingleton.TryGetInstance(instance: out var instance))
+            {
+                Object.DestroyImmediate(obj: instance.gameObject);
+            }
+            default(TestPersistentSingleton).ResetStaticCacheForTesting();
+        }
+
+        [UnityTest]
+        public IEnumerator Singleton_CanBeDestroyed_Safely()
+        {
+            var instance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: instance, message: "Should create instance");
+
+            // Destroy the instance
+            Object.DestroyImmediate(obj: instance.gameObject);
+            yield return null;
+
+            // Access again - should create new instance
+            var newInstance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: newInstance, message: "Should create new instance after destruction");
+            Assert.AreNotSame(expected: instance, actual: newInstance, message: "Should be different instances");
+        }
+
+        [UnityTest]
+        public IEnumerator DestroyedInstance_DoesNotAffectNewInstance()
+        {
+            var firstInstance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: firstInstance, message: "Should create first instance");
+
+            // Destroy first instance while keeping reference
+            Object.DestroyImmediate(obj: firstInstance.gameObject);
+            yield return null;
+
+            // Create new instance
+            var secondInstance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: secondInstance, message: "Should create second instance");
+
+            // Verify second instance is functional
+            Assert.AreNotSame(expected: firstInstance, actual: secondInstance, message: "Should be different instances");
+            Assert.IsFalse(condition: ReferenceEquals(objA: null, objB: secondInstance.gameObject), message: "Second instance GameObject should exist");
+        }
+
+        [UnityTest]
+        public IEnumerator Instance_CanBeAccessed_DuringDestruction()
+        {
+            var instance = TestPersistentSingleton.Instance;
+            yield return null;
+
+            Assert.IsNotNull(anObject: instance, message: "Should create instance");
+
+            // Access while instance still exists
+            var sameInstance = TestPersistentSingleton.Instance;
+            Assert.AreSame(expected: instance, actual: sameInstance, message: "Should return same instance while alive");
+
+            // Destroy and verify TryGetInstance behavior
+            Object.DestroyImmediate(obj: instance.gameObject);
+            yield return null;
+
+            bool result = TestPersistentSingleton.TryGetInstance(instance: out var retrieved);
+            Assert.IsFalse(condition: result, message: "TryGetInstance should return false after destruction");
+            Assert.IsNull(anObject: retrieved, message: "Retrieved instance should be null after destruction");
+        }
+    }
+
+    [TestFixture]
     public class PracticalUsageTests
     {
         [TearDown]
@@ -645,7 +924,7 @@ namespace Singletons.Tests.Runtime
         public IEnumerator LevelController_RequiresPlacement()
         {
             // Without placement, should return null
-            var result = LevelController.TryGetInstance(instance: out var controller);
+            bool result = LevelController.TryGetInstance(instance: out var controller);
             yield return null;
 
             Assert.IsFalse(condition: result, message: "Should return false when not placed");
@@ -657,7 +936,7 @@ namespace Singletons.Tests.Runtime
             yield return null;
 
             // Now should work
-            var result2 = LevelController.TryGetInstance(instance: out var controller2);
+            bool result2 = LevelController.TryGetInstance(instance: out var controller2);
             yield return null;
 
             Assert.IsTrue(condition: result2, message: "Should return true when placed");

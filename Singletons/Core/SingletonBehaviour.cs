@@ -225,7 +225,7 @@ namespace Singletons.Core
 
             if (Application.isPlaying)
             {
-                Destroy(obj: candidate.gameObject);
+                Object.Destroy(obj: candidate.gameObject);
             }
 
             return null;
@@ -254,7 +254,7 @@ namespace Singletons.Core
 
             SingletonRuntime.EnsureInitializedForCurrentPlaySession();
 
-            var current = SingletonRuntime.PlaySessionId;
+            int current = SingletonRuntime.PlaySessionId;
             if (_cachedPlaySessionId == current) return;
 
             _cachedPlaySessionId = current;
@@ -267,13 +267,13 @@ namespace Singletons.Core
 
             if (SingletonRuntime.IsQuitting)
             {
-                Destroy(obj: this.gameObject);
+                Object.Destroy(obj: this.gameObject);
                 return;
             }
 
             if (!this.TryEstablishAsInstance()) return;
 
-            var currentPlaySessionId = SingletonRuntime.PlaySessionId;
+            int currentPlaySessionId = SingletonRuntime.PlaySessionId;
             if (this._initializedPlaySessionId == currentPlaySessionId) return;
 
             this.EnsurePersistent();
@@ -287,14 +287,14 @@ namespace Singletons.Core
                 if (ReferenceEquals(objA: _instance, objB: this)) return true;
 
                 SingletonLogger.LogWarning(message: $"Duplicate detected. Existing='{_instance.name}', destroying '{this.name}'.", typeTag: LogCategoryName, context: this);
-                Destroy(obj: this.gameObject);
+                Object.Destroy(obj: this.gameObject);
                 return false;
             }
 
             if (this.GetType() != typeof(T))
             {
                 SingletonLogger.LogError(message: $"Type mismatch. Expected='{typeof(T).Name}', Actual='{this.GetType().Name}', destroying '{this.name}'.", typeTag: LogCategoryName, context: this);
-                Destroy(obj: this.gameObject);
+                Object.Destroy(obj: this.gameObject);
                 return false;
             }
 

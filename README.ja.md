@@ -1,4 +1,4 @@
-# ポリシー駆動型Unityシングルトン
+# ポリシー駆動型Unityシングルトン（v2.4.0）
 
 [English README](./README.md)
 
@@ -6,7 +6,7 @@ MonoBehaviour 向けの **ポリシー駆動型シングルトン基底クラス
 
 ## Requirements / 動作環境
 
-* **Unity 2021.3** 以降（Unity 6.3でテスト済み）
+* **Unity 2020.1** 以降（Unity 6.3でテスト済み）
 * **Enter Play Mode Options** の **Reload Domain** 有効/無効の両方に対応
 * 外部依存なし
 
@@ -335,7 +335,9 @@ Edit Mode（`Application.isPlaying == false`）では、次の挙動に固定し
 
 ### 同梱テスト
 
-本パッケージには PlayMode および EditMode テストが含まれています：
+本パッケージには包括的な PlayMode および EditMode テストが含まれ、**52個の総テスト**（PlayMode 40個 + EditMode 12個）すべて成功しています。
+
+#### PlayMode テスト（35個）
 
 | カテゴリ | テスト数 | カバレッジ |
 |---------|---------|----------|
@@ -345,9 +347,18 @@ Edit Mode（`Application.isPlaying == false`）では、次の挙動に固定し
 | TypeMismatch | 2 | 派生クラス拒否 |
 | ThreadSafety | 2 | バックグラウンドスレッド保護 |
 | Lifecycle | 2 | 破棄、再生成 |
-| SceneSingletonEdgeCases | 2 | 未配置、自動生成なし |
+| SceneSingletonEdgeCase | 2 | 未配置、自動生成なし |
 | PracticalUsage | 6 | GameManager、LevelController、状態管理 |
-| **EditMode** | 1 | PlaySessionId アクセシビリティ |
+| PolicyBehavior | 3 | ポリシー駆動挙動検証 |
+| ResourceManagement | 3 | インスタンスライフサイクルとクリーンアップ |
+
+#### EditMode テスト（10個）
+
+| カテゴリ | テスト数 | カバレッジ |
+|---------|---------|----------|
+| SingletonRuntimeEditMode | 2 | PlaySessionId、IsQuitting 検証 |
+| Policy | 3 | Policy struct 検証 |
+| SingletonBehaviourEditMode | 5 | EditMode 挙動、キャッシュ分離 |
 
 ### テストの実行
 

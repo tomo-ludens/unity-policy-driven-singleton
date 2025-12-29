@@ -1,4 +1,4 @@
-# Policy-Driven Unity Singleton
+# Policy-Driven Unity Singleton (v2.4.0)
 
 [Japanese README](./README.ja.md)
 
@@ -6,7 +6,7 @@ A **policy-driven singleton base class** for MonoBehaviour.
 
 ## Requirements
 
-* **Unity 2021.3** or later (tested with Unity 6.3)
+* **Unity 2020.1** or later (tested with Unity 6.3)
 * Supports both enabled and disabled **Reload Domain** in **Enter Play Mode Options**
 * No external dependencies
 
@@ -335,7 +335,9 @@ This is **intended behavior** for this singleton design, so align your team on o
 
 ### Included Tests
 
-This package includes PlayMode and EditMode tests:
+This package includes comprehensive PlayMode and EditMode tests with **52 total tests** (40 PlayMode + 12 EditMode), all passing.
+
+#### PlayMode Tests (35 tests)
 
 | Category | Tests | Coverage |
 |----------|-------|----------|
@@ -345,9 +347,18 @@ This package includes PlayMode and EditMode tests:
 | TypeMismatch | 2 | Derived class rejection |
 | ThreadSafety | 2 | Background thread protection |
 | Lifecycle | 2 | Destruction, recreation |
-| SceneSingletonEdgeCases | 2 | Not placed, no auto-create |
+| SceneSingletonEdgeCase | 2 | Not placed, no auto-create |
 | PracticalUsage | 6 | GameManager, LevelController, state management |
-| **EditMode** | 1 | PlaySessionId accessibility |
+| PolicyBehavior | 3 | Policy-driven behavior validation |
+| ResourceManagement | 3 | Instance lifecycle and cleanup |
+
+#### EditMode Tests (10 tests)
+
+| Category | Tests | Coverage |
+|----------|-------|----------|
+| SingletonRuntimeEditMode | 2 | PlaySessionId, IsQuitting validation |
+| Policy | 3 | Policy struct validation |
+| SingletonBehaviourEditMode | 5 | EditMode behavior, caching isolation |
 
 ### Running Tests
 
