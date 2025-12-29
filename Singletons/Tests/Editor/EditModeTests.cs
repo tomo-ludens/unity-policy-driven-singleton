@@ -19,6 +19,7 @@ namespace Singletons.Tests.Editor
         [Test]
         public void IsQuitting_ReturnsFalse_InEditMode()
         {
+            TestExtensions.ResetQuittingFlagForTesting();
             Assert.IsFalse(condition: SingletonRuntime.IsQuitting, message: "IsQuitting should be false in Edit Mode");
         }
     }
@@ -220,7 +221,7 @@ namespace Singletons.Tests.Editor
     }
 
     // Test singleton classes for EditMode testing
-    public sealed class TestPersistentSingletonForEditMode : PersistentSingletonBehaviour<TestPersistentSingletonForEditMode>
+    public sealed class TestPersistentSingletonForEditMode : GlobalSingleton<TestPersistentSingletonForEditMode>
     {
         protected override void Awake()
         {
@@ -228,7 +229,7 @@ namespace Singletons.Tests.Editor
         }
     }
 
-    public sealed class TestSceneSingletonForEditMode : SceneSingletonBehaviour<TestSceneSingletonForEditMode>
+    public sealed class TestSceneSingletonForEditMode : SceneSingleton<TestSceneSingletonForEditMode>
     {
         protected override void Awake()
         {

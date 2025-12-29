@@ -11,11 +11,11 @@ namespace Singletons
     /// <para><b>Behavior:</b> No auto-creation (must be pre-placed), no <c>DontDestroyOnLoad</c>. Missing instance throws (DEV) or returns null (Release).</para>
     /// <para><b>Access:</b> Prefer <c>TryGetInstance(out T)</c> for safe access.</para>
     /// <para><b>Lifecycle:</b> Override <c>Awake</c>/<c>OnDestroy</c> for initialization/cleanup; base calls are required (checked at runtime via OnEnable).</para>
-    /// <para><b>vs Persistent:</b> Use <see cref="PersistentSingletonBehaviour{T}"/> for global managers that must persist.</para>
+    /// <para><b>vs Persistent:</b> Use <see cref="GlobalSingleton{T}"/> for global managers that must persist.</para>
     /// </remarks>
     /// <example>
     /// <code>
-    /// public sealed class LevelManager : SceneSingletonBehaviour&lt;LevelManager&gt;
+    /// public sealed class LevelManager : SceneSingleton&lt;LevelManager&gt;
     /// {
     ///     protected override void Awake()
     ///     {
@@ -27,8 +27,8 @@ namespace Singletons
     /// if (LevelManager.TryGetInstance(out var mgr)) { mgr.DoSomething(); }
     /// </code>
     /// </example>
-    public abstract class SceneSingletonBehaviour<T> : SingletonBehaviour<T, SceneScopedPolicy>
-        where T : SceneSingletonBehaviour<T>
+    public abstract class SceneSingleton<T> : SingletonBehaviour<T, SceneScopedPolicy>
+        where T : SceneSingleton<T>
     {
     }
 }

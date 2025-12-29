@@ -7,7 +7,7 @@ namespace Singletons.Tests.Runtime
 {
     #region Test Singleton Classes
 
-    public sealed class TestPersistentSingleton : PersistentSingletonBehaviour<TestPersistentSingleton>
+    public sealed class TestPersistentSingleton : GlobalSingleton<TestPersistentSingleton>
     {
         public int AwakeCount { get; private set; }
 
@@ -18,7 +18,7 @@ namespace Singletons.Tests.Runtime
         }
     }
 
-    public sealed class TestSceneSingleton : SceneSingletonBehaviour<TestSceneSingleton>
+    public sealed class TestSceneSingleton : SceneSingleton<TestSceneSingleton>
     {
         public bool WasInitialized { get; private set; }
 
@@ -30,7 +30,7 @@ namespace Singletons.Tests.Runtime
     }
 
     // For type mismatch tests - a base class that is NOT sealed
-    public class TestBaseSingleton : PersistentSingletonBehaviour<TestBaseSingleton>
+    public class TestBaseSingleton : GlobalSingleton<TestBaseSingleton>
     {
     }
 
@@ -40,7 +40,7 @@ namespace Singletons.Tests.Runtime
     }
 
     // For inactive instance tests
-    public sealed class TestInactiveSingleton : PersistentSingletonBehaviour<TestInactiveSingleton>
+    public sealed class TestInactiveSingleton : GlobalSingleton<TestInactiveSingleton>
     {
     }
 
@@ -244,7 +244,7 @@ namespace Singletons.Tests.Runtime
         [UnityTest]
         public IEnumerator Instance_ThrowsInEditor_WhenInactiveInstanceExists()
         {
-            // Create GO, add component (Awake caches it), then set inactive
+            // Create GO, add component (Awake runs but doesn't cache yet), then set inactive
             var go = new GameObject(name: "InactiveSingleton");
             go.AddComponent<TestInactiveSingleton>();
             go.SetActive(value: false);
@@ -651,7 +651,7 @@ namespace Singletons.Tests.Runtime
     /// <summary>
     /// GameManager-like persistent singleton for practical usage testing
     /// </summary>
-    public sealed class GameManager : PersistentSingletonBehaviour<GameManager>
+    public sealed class GameManager : GlobalSingleton<GameManager>
     {
         public int PlayerScore { get; private set; }
         public string CurrentLevel { get; private set; }
@@ -689,7 +689,7 @@ namespace Singletons.Tests.Runtime
     /// <summary>
     /// LevelController-like scene singleton for practical usage testing
     /// </summary>
-    public sealed class LevelController : SceneSingletonBehaviour<LevelController>
+    public sealed class LevelController : SceneSingleton<LevelController>
     {
         public string LevelName { get; private set; }
         public int EnemyCount { get; private set; }

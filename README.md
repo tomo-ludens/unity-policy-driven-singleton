@@ -27,8 +27,8 @@ They share the same core logic, while a **policy** controls the lifecycle behavi
 
 | Class | Persist Across Scenes | Auto-Create | Intended Use |
 | --- | --- | --- | --- |
-| **`PersistentSingletonBehaviour<T>`** | ✅ Yes | ✅ Yes | Managers that should always exist for the entire game (e.g., GameManager) |
-| **`SceneSingletonBehaviour<T>`** | ❌ No | ❌ No | Controllers that only operate within a specific scene (e.g., LevelController) |
+| **`GlobalSingleton<T>`** | ✅ Yes | ✅ Yes | Managers that should always exist for the entire game (e.g., GameManager) |
+| **`SceneSingleton<T>`** | ❌ No | ❌ No | Controllers that only operate within a specific scene (e.g., LevelController) |
 
 ### Key Features
 
@@ -50,8 +50,8 @@ They share the same core logic, while a **policy** controls the lifecycle behavi
 Singletons/
 ├── Singletons.asmdef                 # Assembly Definition
 ├── AssemblyInfo.cs                   # InternalsVisibleTo for tests
-├── PersistentSingletonBehaviour.cs   # Public API (persistent + auto-create)
-├── SceneSingletonBehaviour.cs        # Public API (scene-scoped + no auto-create)
+├── GlobalSingleton.cs   # Public API (persistent + auto-create)
+├── SceneSingleton.cs        # Public API (scene-scoped + no auto-create)
 ├── Core/
 │   ├── SingletonBehaviour.cs         # Core implementation
 │   ├── SingletonRuntime.cs           # Internal runtime (Domain Reload handling)
@@ -95,7 +95,7 @@ Persists across scenes, and auto-creates when accessed if not found.
 using Singletons;
 
 // Sealing is recommended to prevent accidental inheritance.
-public sealed class GameManager : PersistentSingletonBehaviour<GameManager>
+public sealed class GameManager : GlobalSingleton<GameManager>
 {
     public int Score { get; private set; }
 
@@ -119,7 +119,7 @@ Must be placed in the scene. No auto-creation. Destroyed when the scene unloads.
 ```csharp
 using Singletons;
 
-public sealed class LevelController : SceneSingletonBehaviour<LevelController>
+public sealed class LevelController : SceneSingleton<LevelController>
 {
     protected override void Awake()
     {
@@ -337,7 +337,7 @@ This is **intended behavior** for this singleton design, so align your team on o
 
 This package includes comprehensive PlayMode and EditMode tests with **52 total tests** (40 PlayMode + 12 EditMode), all passing.
 
-#### PlayMode Tests (35 tests)
+#### PlayMode Tests (40 tests)
 
 | Category | Tests | Coverage |
 |----------|-------|----------|
@@ -345,19 +345,19 @@ This package includes comprehensive PlayMode and EditMode tests with **52 total 
 | SceneSingleton | 5 | Placement, no auto-create, duplicates |
 | InactiveInstance | 3 | Inactive GO detection, disabled component |
 | TypeMismatch | 2 | Derived class rejection |
-| ThreadSafety | 2 | Background thread protection |
+| ThreadSafety | 7 | Background thread protection, main thread validation |
 | Lifecycle | 2 | Destruction, recreation |
 | SceneSingletonEdgeCase | 2 | Not placed, no auto-create |
 | PracticalUsage | 6 | GameManager, LevelController, state management |
 | PolicyBehavior | 3 | Policy-driven behavior validation |
 | ResourceManagement | 3 | Instance lifecycle and cleanup |
 
-#### EditMode Tests (10 tests)
+#### EditMode Tests (12 tests)
 
 | Category | Tests | Coverage |
 |----------|-------|----------|
 | SingletonRuntimeEditMode | 2 | PlaySessionId, IsQuitting validation |
-| Policy | 3 | Policy struct validation |
+| Policy | 5 | Policy struct validation, immutability, interface compliance |
 | SingletonBehaviourEditMode | 5 | EditMode behavior, caching isolation |
 
 ### Running Tests

@@ -27,5 +27,16 @@ namespace Singletons.Tests
             var cachedIdField = type.GetField(name: "_cachedPlaySessionId", bindingAttr: System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
             cachedIdField?.SetValue(obj: null, value: -1);
         }
+
+        /// <summary>
+        /// Test-only: Resets the quitting flag in SingletonRuntime.
+        /// </summary>
+        public static void ResetQuittingFlagForTesting()
+        {
+            // Use reflection to access private static field
+            var type = typeof(SingletonRuntime);
+            var field = type.GetField(name: "IsQuitting", bindingAttr: System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            field?.SetValue(obj: null, value: false);
+        }
     }
 }

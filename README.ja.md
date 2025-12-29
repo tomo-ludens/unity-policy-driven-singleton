@@ -27,8 +27,8 @@ MonoBehaviour 向けの **ポリシー駆動型シングルトン基底クラス
 
 | クラス | シーン間永続 | 自動生成 | 用途 |
 | --- | --- | --- | --- |
-| **`PersistentSingletonBehaviour<T>`** | ✅ する | ✅ する | ゲーム全体で常に存在するマネージャ（GameManager など） |
-| **`SceneSingletonBehaviour<T>`** | ❌ しない | ❌ しない | 特定のシーン内でのみ動作するコントローラ（LevelController など） |
+| **`GlobalSingleton<T>`** | ✅ する | ✅ する | ゲーム全体で常に存在するマネージャ（GameManager など） |
+| **`SceneSingleton<T>`** | ❌ しない | ❌ しない | 特定のシーン内でのみ動作するコントローラ（LevelController など） |
 
 ### 主な特長
 
@@ -50,8 +50,8 @@ MonoBehaviour 向けの **ポリシー駆動型シングルトン基底クラス
 Singletons/
 ├── Singletons.asmdef                 # Assembly Definition
 ├── AssemblyInfo.cs                   # InternalsVisibleTo（テスト用）
-├── PersistentSingletonBehaviour.cs   # Public API (永続・自動生成あり)
-├── SceneSingletonBehaviour.cs        # Public API (シーン限定・自動生成なし)
+├── GlobalSingleton.cs   # Public API (永続・自動生成あり)
+├── SceneSingleton.cs        # Public API (シーン限定・自動生成なし)
 ├── Core/
 │   ├── SingletonBehaviour.cs         # コア実装
 │   ├── SingletonRuntime.cs           # 内部ランタイム (Domain Reload対策)
@@ -95,7 +95,7 @@ Singletons/
 using Singletons;
 
 // 継承禁止 (sealed) を推奨します
-public sealed class GameManager : PersistentSingletonBehaviour<GameManager>
+public sealed class GameManager : GlobalSingleton<GameManager>
 {
     public int Score { get; private set; }
 
@@ -119,7 +119,7 @@ Scene 上に配置して使用します。自動生成は行わず、Scene ア�
 ```csharp
 using Singletons;
 
-public sealed class LevelController : SceneSingletonBehaviour<LevelController>
+public sealed class LevelController : SceneSingleton<LevelController>
 {
     protected override void Awake()
     {
@@ -337,7 +337,7 @@ Edit Mode（`Application.isPlaying == false`）では、次の挙動に固定し
 
 本パッケージには包括的な PlayMode および EditMode テストが含まれ、**52個の総テスト**（PlayMode 40個 + EditMode 12個）すべて成功しています。
 
-#### PlayMode テスト（35個）
+#### PlayMode テスト（40個）
 
 | カテゴリ | テスト数 | カバレッジ |
 |---------|---------|----------|
@@ -345,19 +345,19 @@ Edit Mode（`Application.isPlaying == false`）では、次の挙動に固定し
 | SceneSingleton | 5 | 配置、自動生成なし、重複検出 |
 | InactiveInstance | 3 | 非アクティブGO検出、無効コンポーネント |
 | TypeMismatch | 2 | 派生クラス拒否 |
-| ThreadSafety | 2 | バックグラウンドスレッド保護 |
+| ThreadSafety | 7 | バックグラウンドスレッド保護、メインロード検証 |
 | Lifecycle | 2 | 破棄、再生成 |
 | SceneSingletonEdgeCase | 2 | 未配置、自動生成なし |
 | PracticalUsage | 6 | GameManager、LevelController、状態管理 |
 | PolicyBehavior | 3 | ポリシー駆動挙動検証 |
 | ResourceManagement | 3 | インスタンスライフサイクルとクリーンアップ |
 
-#### EditMode テスト（10個）
+#### EditMode テスト（12個）
 
 | カテゴリ | テスト数 | カバレッジ |
 |---------|---------|----------|
 | SingletonRuntimeEditMode | 2 | PlaySessionId、IsQuitting 検証 |
-| Policy | 3 | Policy struct 検証 |
+| Policy | 5 | Policy struct 検証、不変性、インターフェース準拠 |
 | SingletonBehaviourEditMode | 5 | EditMode 挙動、キャッシュ分離 |
 
 ### テストの実行
