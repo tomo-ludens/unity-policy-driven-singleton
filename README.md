@@ -1,4 +1,4 @@
-# Policy-Driven Unity Singleton (v3.0.5)
+# Policy-Driven Unity Singleton (v3.0.6)
 
 [Japanese README](./README.ja.md)
 
@@ -11,6 +11,10 @@ A **policy-driven singleton base class** for MonoBehaviour.
 - [Overview](#overview)
   - [Provided Classes](#provided-classes)
   - [Key Features](#key-features)
+- [Architecture](#architecture)
+  - [Component Overview](#component-overview)
+  - [Policy Comparison](#policy-comparison)
+  - [Domain Reload Disabled: Play Session Boundary](#domain-reload-disabled-play-session-boundary)
 - [Directory Structure](#directory-structure)
 - [Dependencies](#dependencies-assumed-unity-api-behavior)
 - [Installation](#installation)
@@ -67,9 +71,112 @@ They share the same core logic, while a **policy** controls the lifecycle behavi
   * **Reinitialization (Soft Reset)**: Performs state reset at the **Play-session boundary** and reinitializes every Play session (aligned with the `PlaySessionId` strategy).
 * **Strict type checks**: Rejects references where the generic type `T` does not exactly match the concrete runtime type, preventing misuse.
 * **Development safety (DEV/EDITOR)**:
+
+Notes on quitting (important):
+- Unity's quit / Play Mode exit event order can vary by Unity version and environment (Editor vs Player).
+- This library does **not** attempt to fully control the shutdown sequence; it uses `IsQuitting` as a **best-effort guard** to suppress singleton access and avoid resurrection during shutdown.
+
   * `FindAnyObjectByType(...Exclude)` does **not** consider inactive objects, so an inactive singleton can be treated as "missing" → auto-created → silently duplicated. To prevent this, DEV/EDITOR uses **fail-fast** (throws) when an inactive singleton is detected.
   * Accessing a SceneSingleton that was not placed in the scene also uses **fail-fast** (throws) in DEV/EDITOR.
 * **Release build optimization**: Logs and validation checks are stripped; on error the API returns `null` / `false` (callers must handle this).
+
+## Architecture
+
+### Component Overview
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                           Public API                                │
+│  ┌───────────────────────────┐    ┌───────────────────────────────┐ │
+│  │    GlobalSingleton<T>     │    │      SceneSingleton<T>        │ │
+│  │    (PersistentPolicy)     │    │     (SceneScopedPolicy)       │ │
+│  │  • DontDestroyOnLoad      │    │  • Scene lifecycle bound      │ │
+│  │  • Auto-create if missing │    │  • No auto-create             │ │
+│  └─────────────┬─────────────┘    └───────────────┬───────────────┘ │
+└────────────────┼──────────────────────────────────┼─────────────────┘
+                 │          inheritance             │
+                 └──────────────┬───────────────────┘
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                 SingletonBehaviour<T, TPolicy>                      │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌────────────────────────┐ │
+│  │    Instance     │ │  TryGetInstance │ │   Lifecycle Hooks      │ │
+│  │  (auto-create)  │ │  (safe access)  │ │  OnPlaySessionStart()  │ │
+│  └─────────────────┘ └─────────────────┘ └────────────────────────┘ │
+└─────────────────────────────┬───────────────────────────────────────┘
+                              │ uses
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐
+│ SingletonRuntime│  │ ISingletonPolicy│  │    SingletonLogger      │
+│ • PlaySessionId │  │ • PersistAcross │  │ • Log/Warn/Error        │
+│ • IsQuitting    │  │   Scenes        │  │ • Conditional compile   │
+│ • Thread check  │  │ • AutoCreateIf  │  │ • Stripped in release   │
+│                 │  │   Missing       │  │                         │
+└────────┬────────┘  └─────────────────┘  └─────────────────────────┘
+         │ editor hooks
+         ▼
+┌─────────────────────┐
+│SingletonEditorHooks │
+│ (Play Mode events)  │
+└─────────────────────┘
+```
+
+ Notes:
+ - **Editor hooks direction**: `SingletonEditorHooks` (Editor-only) calls `SingletonRuntime.NotifyQuitting()`; runtime code does not depend on Editor hooks.
+ - **Namespaces/assemblies**: `SingletonEditorHooks` exists under `Singletons.Core.Editor` and is compiled only in the Editor.
+
+### Policy Comparison
+
+```mermaid
+classDiagram
+    class ISingletonPolicy {
+        <<interface>>
+        +bool PersistAcrossScenes
+        +bool AutoCreateIfMissing
+    }
+    class PersistentPolicy {
+        <<struct>>
+        +PersistAcrossScenes = true
+        +AutoCreateIfMissing = true
+    }
+    class SceneScopedPolicy {
+        <<struct>>
+        +PersistAcrossScenes = false
+        +AutoCreateIfMissing = false
+    }
+    ISingletonPolicy <|.. PersistentPolicy
+    ISingletonPolicy <|.. SceneScopedPolicy
+```
+
+ Notes:
+ - Policies are implemented as `readonly struct` with constant getters (values are effectively compile-time constants).
+
+### Domain Reload Disabled: Play Session Boundary
+
+```text
+ Play Session 1                          Play Session 2
+─────────────────────────────────────────────────────────────────────────▶
+                                                                    time
+    ┌─────────────────────┐              ┌─────────────────────┐
+    │  PlaySessionId: 1   │              │  PlaySessionId: 2   │
+    └─────────────────────┘              └─────────────────────┘
+              │                                    │
+    ┌─────────▼─────────┐              ┌─────────▼─────────┐
+    │ Static cache OK   │              │ Static cache OK   │
+    │ Instance: 0xABC   │   ───────▶   │ Instance: 0xABC   │ (same object)
+    └───────────────────┘   Invalidate └───────────────────┘
+                            & Refresh
+                                 │
+                    ┌────────────▼────────────┐
+                    │ OnPlaySessionStart()    │
+                    │ called again            │
+                    │ (per-session reinit)    │
+                    └─────────────────────────┘
+```
+
+ Notes:
+ - The static cache (`_instance`) is cleared when `PlaySessionId` changes, even if the underlying scene object still exists.
 
 ## Directory Structure
 
@@ -329,6 +436,17 @@ Additionally, Unity has a known issue where `RuntimeInitializeOnLoadMethod` on a
 
 ## Constraints & Best Practices
 
+### 0. Intentional Constraints (Design Contract)
+
+This library intentionally enforces constraints to reduce hard-to-debug Unity issues (hidden duplicates, resurrection during quit, and ordering coupling). In DEV/EDITOR builds, some of these become fail-fast exceptions.
+
+* **Main thread only (Play Mode)**: `Instance` / `TryGetInstance` must be called from the main thread.
+* **Exact type required**: A reference where the runtime type does not exactly match `T` is rejected (e.g., a derived type is not accepted).
+* **Avoid inactive/disabled instances**: Inactive/disabled components can be treated as "missing" by Unity find APIs; DEV/EDITOR throws to prevent hidden duplication.
+* **SceneSingleton must be placed**: Scene-scoped singletons are never auto-created; forgetting placement throws in DEV/EDITOR and returns `null` in Player builds.
+* **During quitting**: Singleton access is suppressed (`null` / `false`) as a best-effort guard against resurrection.
+* **Release builds may return null/false**: DEV/EDITOR-only exceptions and logs are stripped by design; callers must handle `null` / `false`.
+
 ### 1. Seal concrete classes
 
 Further inheriting from a concrete singleton (e.g., `GameManager`) is not recommended.
@@ -416,8 +534,8 @@ This package includes comprehensive PlayMode and EditMode tests with **74 total 
 
 | Category | Tests | Coverage |
 |----------|-------|----------|
-| GlobalSingleton | 7 | Auto-creation, caching, duplicates |
-| SceneSingleton | 5 | Placement, no auto-create, duplicates |
+| GlobalSingleton | 7 | Auto-creation, caching, duplicate detection |
+| SceneSingleton | 5 | Placement, no auto-create, duplicate detection |
 | InactiveInstance | 3 | Inactive GO detection, disabled component |
 | TypeMismatch | 2 | Derived class rejection |
 | ThreadSafety | 7 | Background thread protection, main thread validation |
