@@ -1,4 +1,4 @@
-# ポリシー駆動型Unityシングルトン（v3.0.1）
+# ポリシー駆動型Unityシングルトン（v3.0.2）
 
 [English README](./README.md)
 
@@ -82,7 +82,9 @@ Singletons/
 ├── Core/
 │   ├── SingletonBehaviour.cs         # コア実装
 │   ├── SingletonRuntime.cs           # 内部ランタイム (Domain Reload対策)
-│   └── SingletonLogger.cs            # 条件付きロガー (リリースで除去)
+│   ├── SingletonLogger.cs            # 条件付きロガー (リリースで除去)
+│   └── Editor/
+│       └── SingletonEditorHooks.cs   # Editorイベントフック (Play Mode状態)
 ├── Policy/
 │   ├── ISingletonPolicy.cs           # ポリシーIF
 │   ├── PersistentPolicy.cs           # 永続ポリシーの実装

@@ -1,4 +1,4 @@
-# Policy-Driven Unity Singleton (v3.0.1)
+# Policy-Driven Unity Singleton (v3.0.2)
 
 [Japanese README](./README.ja.md)
 
@@ -82,7 +82,9 @@ Singletons/
 ├── Core/
 │   ├── SingletonBehaviour.cs         # Core implementation
 │   ├── SingletonRuntime.cs           # Internal runtime (Domain Reload handling)
-│   └── SingletonLogger.cs            # Conditional logger (stripped in release)
+│   ├── SingletonLogger.cs            # Conditional logger (stripped in release)
+│   └── Editor/
+│       └── SingletonEditorHooks.cs   # Editor event hooks (Play Mode state)
 ├── Policy/
 │   ├── ISingletonPolicy.cs           # Policy interface
 │   ├── PersistentPolicy.cs           # Persistent policy implementation

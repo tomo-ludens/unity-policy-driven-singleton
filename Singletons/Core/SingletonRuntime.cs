@@ -30,6 +30,10 @@ namespace Singletons.Core
 
         private static bool IsMainThread => _mainThreadId != UninitializedMainThreadId && _mainThreadId == Thread.CurrentThread.ManagedThreadId;
 
+        /// <summary>
+        /// Ensures runtime state is initialized for the current Play session.
+        /// Registers Application.quitting callback and captures main thread ID if needed.
+        /// </summary>
         internal static void EnsureInitializedForCurrentPlaySession()
         {
             if (!Application.isPlaying) return;
@@ -41,12 +45,13 @@ namespace Singletons.Core
             {
                 TryLazyCaptureMainThreadId(callerContext: "EnsureInitializedForCurrentPlaySession");
             }
-
-#if UNITY_EDITOR
-            EnsureEditorHooks();
-#endif
         }
 
+        /// <summary>
+        /// Validates that the caller is on the main thread.
+        /// </summary>
+        /// <param name="callerContext">Context name for error logging.</param>
+        /// <returns>True if on main thread; false otherwise.</returns>
         internal static bool ValidateMainThread(string callerContext)
         {
             if (!Application.isPlaying) return true;
@@ -72,8 +77,10 @@ namespace Singletons.Core
         }
 
         /// <summary>
-        /// First reliable point in Play Mode where main thread ID can be captured.
+        /// Called by Editor hooks when exiting Play Mode.
         /// </summary>
+        internal static void NotifyQuitting() => IsQuitting = true;
+
         [RuntimeInitializeOnLoadMethod(loadType: RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void SubsystemRegistration()
         {
@@ -98,10 +105,7 @@ namespace Singletons.Core
             IsQuitting = false;
         }
 
-        private static void OnQuitting()
-        {
-            IsQuitting = true;
-        }
+        private static void OnQuitting() => IsQuitting = true;
 
         private static bool TryLazyCaptureMainThreadId(string callerContext)
         {
@@ -113,26 +117,5 @@ namespace Singletons.Core
             SingletonLogger.LogWarning(message: $"Main thread ID lazily captured as {_mainThreadId}.\nContext: '{callerContext}'.");
             return true;
         }
-
-#if UNITY_EDITOR
-        private static bool _editorHooksInstalled;
-
-        private static void EnsureEditorHooks()
-        {
-            if (_editorHooksInstalled) return;
-
-            _editorHooksInstalled = true;
-            UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
-            UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
-        }
-
-        private static void OnPlayModeStateChanged(UnityEditor.PlayModeStateChange state)
-        {
-            if (state == UnityEditor.PlayModeStateChange.ExitingPlayMode)
-            {
-                IsQuitting = true;
-            }
-        }
-#endif
     }
 }
