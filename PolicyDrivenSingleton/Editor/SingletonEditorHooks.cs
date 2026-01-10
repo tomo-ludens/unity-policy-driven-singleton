@@ -1,10 +1,12 @@
+using System;
 using PolicyDrivenSingleton.Core;
 using UnityEditor;
 
 namespace PolicyDrivenSingleton.Editor
 {
     /// <summary>
-    /// Registers Editor event hooks for singleton infrastructure.
+    /// Editor hooks that clear quitting flag at Play Mode boundaries.
+    /// Prevents stale <c>IsQuitting</c> from poisoning subsequent Play sessions when Domain Reload is disabled.
     /// </summary>
     [InitializeOnLoad]
     internal static class SingletonEditorHooks
@@ -15,11 +17,22 @@ namespace PolicyDrivenSingleton.Editor
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
         }
 
+        [InitializeOnEnterPlayMode]
+        private static void OnEnterPlayMode(EnterPlayModeOptions options) => SingletonRuntime.ClearQuittingFlag();
+
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
         {
-            if (state == PlayModeStateChange.ExitingPlayMode)
+            switch (state)
             {
-                SingletonRuntime.NotifyQuitting();
+                case PlayModeStateChange.EnteredPlayMode:
+                case PlayModeStateChange.ExitingPlayMode:
+                    SingletonRuntime.ClearQuittingFlag();
+                    break;
+                case PlayModeStateChange.EnteredEditMode:
+                case PlayModeStateChange.ExitingEditMode:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(paramName: nameof(state), actualValue: state, message: null);
             }
         }
     }

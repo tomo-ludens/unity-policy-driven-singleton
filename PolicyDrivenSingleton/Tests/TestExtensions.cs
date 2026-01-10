@@ -31,13 +31,7 @@ namespace PolicyDrivenSingleton.Tests
         /// <summary>
         /// Test-only: Resets the quitting flag in SingletonRuntime.
         /// </summary>
-        public static void ResetQuittingFlagForTesting()
-        {
-            // Use reflection to access private static field
-            var type = typeof(SingletonRuntime);
-            var field = type.GetField(name: "<IsQuitting>k__BackingField", bindingAttr: System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
-            field?.SetValue(obj: null, value: false);
-        }
+        public static void ResetQuittingFlagForTesting() => SingletonRuntime.ClearQuittingFlag();
 
         /// <summary>
         /// Test-only: Advances PlaySessionId to simulate a new Play session boundary.
