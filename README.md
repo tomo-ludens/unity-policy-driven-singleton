@@ -190,6 +190,7 @@ private void Update()
 | `T Instance { get; }`        | 必須経路で確立する        | Global: ✅ / Scene: ❌ | 起動・初期化・ゲーム進行必須           |
 | `bool TryGetInstance(out T)` | “あるなら使う”安全経路     |                    ❌ | 後片付け、解除、終了/中断経路          |
 | `OnPlaySessionStart()`       | Playセッションごとの再初期化 |                    - | Domain Reload OFF 対策、再購読 |
+| `TryPostToMainThread(Action)` | バックグラウンド→メイン委譲 |                    - | 非同期処理結果のUI反映等 |
 
 ### Instance / TryGet の挙動（要点）
 
@@ -247,6 +248,15 @@ private void Update()
 | **2回目以降 Play（Domain Reload OFF）** | `OnPlaySessionStart()` のみ（`Awake()` は呼ばれない） |
 | **シングルトン確立時** | 1 Play セッションにつき 1 回のみ |
 
+#### `TryPostToMainThread(Action)` の振る舞い
+
+| 状態 | 振る舞い |
+|------|----------|
+| **メインスレッド上** | 即座に実行、`true` を返す |
+| **バックグラウンドスレッド** | SyncContext 経由で Post、`true` を返す |
+| **SyncContext 未キャプチャ** | `false` を返す（fail-soft）、Error ログ出力 |
+| **null アクション** | `false` を返す |
+
 </details>
 
 ---
@@ -261,16 +271,16 @@ flowchart TB
   end
 
   subgraph Core["Core"]
-    B["SingletonBehaviour<T, TPolicy><br/>• Instance/TryGetInstance<br/>• Hooks: OnPlaySessionStart"]
+    B["SingletonBehaviour<T, TPolicy><br/>• Instance/TryGetInstance<br/>• TryPostToMainThread<br/>• Hooks: OnPlaySessionStart"]
   end
 
   subgraph Runtime["Runtime (internal)"]
-    R["SingletonRuntime<br/>• PlaySessionId<br/>• IsQuitting (best-effort)<br/>• Thread checks"]
+    R["SingletonRuntime<br/>• PlaySessionId<br/>• IsQuitting (best-effort)<br/>• Thread validation<br/>• Main thread posting"]
     L["SingletonLogger<br/>• Conditional logs<br/>• Stripped in Player by design"]
   end
 
   subgraph Editor["Editor only"]
-    E["SingletonEditorHooks<br/>• Play Mode events<br/>• NotifyQuitting()"]
+    E["SingletonEditorHooks<br/>• Play Mode events<br/>• ClearQuittingFlag()"]
   end
 
   G --> B
@@ -281,7 +291,7 @@ flowchart TB
 ```
 
 **Notes:**
-- **Editor hooks の方向**: `SingletonEditorHooks`（Editor専用）が `SingletonRuntime.NotifyQuitting()` を呼び出す。ランタイムコードは Editor フックに依存しない
+- **Editor hooks の方向**: `SingletonEditorHooks`（Editor専用）が `SingletonRuntime.ClearQuittingFlag()` を呼び出し、Play Mode 境界で状態をリセット
 - **internal クラス**: `SingletonRuntime` / `SingletonLogger` は `internal` であり、外部から直接呼び出し不可
 
 ### Design intent（要約）
@@ -454,14 +464,14 @@ public class Bootstrap : MonoBehaviour
 
 ## Testing
 
-PlayMode / EditMode テスト同梱（合計 **74 テスト**：PlayMode 53 / EditMode 21）
+PlayMode / EditMode テスト同梱（合計 **79 テスト**：PlayMode 58 / EditMode 21）
 
 **実行方法**：Window → General → Test Runner → Run All
 
 <details>
 <summary><strong>テストカバレッジ詳細</strong></summary>
 
-#### PlayMode テスト（53個）
+#### PlayMode テスト（58個）
 
 | カテゴリ | テスト数 | カバレッジ |
 |----------|----------|------------|
@@ -470,6 +480,7 @@ PlayMode / EditMode テスト同梱（合計 **74 テスト**：PlayMode 53 / Ed
 | InactiveInstance | 3 | 非アクティブGameObject検出、無効コンポーネント |
 | TypeMismatch | 2 | 派生クラス拒否 |
 | ThreadSafety | 7 | バックグラウンドスレッド保護、メインスレッド検証 |
+| TryPostToMainThread | 5 | メインスレッド実行、バックグラウンドPost、null処理 |
 | Lifecycle | 2 | 破棄、再生成 |
 | SoftReset | 1 | PlaySessionId 境界での Playごとの再初期化 |
 | SceneSingletonEdgeCase | 2 | 未配置、自動生成なし |

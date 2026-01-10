@@ -16,7 +16,8 @@ namespace PolicyDrivenSingleton.Core
         private const string EditorSymbol     = "UNITY_EDITOR";
         private const string DevBuildSymbol   = "DEVELOPMENT_BUILD";
         private const string AssertionsSymbol = "UNITY_ASSERTIONS";
-        private const string InfraTag = "PolicySingleton";
+
+        private const string InfraTag = "PolicyDrivenSingleton";
         private const string InfraPrefix = "[" + InfraTag + "] ";
 
         private static class TypeTagCache<T>

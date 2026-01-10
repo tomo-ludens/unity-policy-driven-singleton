@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using PolicyDrivenSingleton.Policy;
 using UnityEngine;
@@ -25,9 +26,9 @@ namespace PolicyDrivenSingleton.Core
 
         private static readonly TPolicy Policy = default;
 
+        // Per-closed-generic-type: intentional static-in-generic for type-specific singleton cache.
         // ReSharper disable once StaticMemberInGenericType
         private static T _instance;
-
         // ReSharper disable once StaticMemberInGenericType
         private static int _cachedPlaySessionId = UninitializedPlaySessionId;
 
@@ -39,6 +40,9 @@ namespace PolicyDrivenSingleton.Core
         /// Returns singleton instance. In PlayMode, returns null during quit, from background thread, or if validation fails in release.
         /// </summary>
         /// <returns>The singleton instance, or <c>null</c> if unavailable.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown in dev builds when: inactive instance exists, type mismatch detected, or auto-creation disabled with no instance.
+        /// </exception>
         public static T Instance
         {
             get
@@ -69,7 +73,6 @@ namespace PolicyDrivenSingleton.Core
                 {
                     if (!candidate.isActiveAndEnabled)
                     {
-                        // In release: ThrowInvalidOperation call stripped, returns null below.
                         SingletonLogger.ThrowInvalidOperation<T>(message: $"Inactive/disabled instance detected.\nFound: '{candidate.name}' (type: '{candidate.GetType().Name}').\nEnable/activate it or remove it from the scene.");
                         return null;
                     }
@@ -96,6 +99,9 @@ namespace PolicyDrivenSingleton.Core
         /// Non-creating lookup. Does NOT trigger auto-create even if policy allows.
         /// </summary>
         /// <returns><c>true</c> if instance exists and is valid; otherwise <c>false</c>.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown in dev builds when: inactive/disabled instance detected or type mismatch found.
+        /// </exception>
         public static bool TryGetInstance(out T instance)
         {
             if (!SingletonRuntime.ValidateMainThread(callerContext: $"{typeof(T).Name}.TryGetInstance"))
@@ -193,6 +199,14 @@ namespace PolicyDrivenSingleton.Core
         protected virtual void OnPlaySessionStart()
         {
         }
+
+        /// <summary>
+        /// Posts action to main thread via <see cref="SingletonRuntime.TryPostToMainThread"/>.
+        /// Use from background threads to safely interact with Unity APIs.
+        /// </summary>
+        /// <returns><c>true</c> if posted/executed; <c>false</c> if SyncContext unavailable.</returns>
+        protected static bool TryPostToMainThread(Action action, string callerContext = null)
+            => SingletonRuntime.TryPostToMainThread(action: action, callerContext: callerContext ?? $"{typeof(T).Name}.TryPostToMainThread");
 
         private static T CreateInstance()
         {
