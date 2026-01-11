@@ -98,7 +98,7 @@ namespace PolicyDrivenSingleton.Core
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogException(exception: ex);
+                        SingletonLogger.LogException(exception: ex);
                     }
                 },
                 state: null

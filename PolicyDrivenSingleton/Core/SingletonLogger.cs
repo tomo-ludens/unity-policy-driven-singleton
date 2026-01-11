@@ -49,6 +49,23 @@ namespace PolicyDrivenSingleton.Core
             => Debug.LogError(message: TypeTagCache<T>.Prefix + message, context: context);
 
         [Conditional(conditionString: EditorSymbol), Conditional(conditionString: DevBuildSymbol), Conditional(conditionString: AssertionsSymbol)]
+        public static void LogException(Exception exception, UnityEngine.Object context = null)
+        {
+            if (exception == null) return;
+
+            Debug.LogException(exception: exception, context: context);
+        }
+
+        [Conditional(conditionString: EditorSymbol), Conditional(conditionString: DevBuildSymbol), Conditional(conditionString: AssertionsSymbol)]
+        public static void LogException<T>(Exception exception, UnityEngine.Object context = null)
+        {
+            if (exception == null) return;
+
+            LogError<T>(message: $"Exception: {exception.GetType().Name}: {exception.Message}", context: context);
+            Debug.LogException(exception: exception, context: context);
+        }
+
+        [Conditional(conditionString: EditorSymbol), Conditional(conditionString: DevBuildSymbol), Conditional(conditionString: AssertionsSymbol)]
         public static void ThrowInvalidOperation<T>(string message)
             => throw new InvalidOperationException(message: TypeTagCache<T>.Prefix + message);
     }
