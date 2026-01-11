@@ -24,8 +24,7 @@ namespace PolicyDrivenSingleton.Core
 
         internal static void EnsureInitializedForCurrentPlaySession()
         {
-            // Lazy initialization for cases where RuntimeInitializeOnLoadMethod hasn't run yet
-            if (Volatile.Read(location: ref _mainThreadId) == 0)
+            if (Volatile.Read(location: ref _mainThreadId) == 0 && SynchronizationContext.Current != null)
             {
                 Volatile.Write(location: ref _mainThreadId, value: Thread.CurrentThread.ManagedThreadId);
             }
