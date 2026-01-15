@@ -137,6 +137,7 @@ PolicyDrivenSingleton (Runtime)
   └─ PolicyDrivenSingleton.Editor (Editor-only)
        └─ PolicyDrivenSingleton.Editor.Tests (Editor tests)
   └─ PolicyDrivenSingleton.Tests (Runtime/PlayMode tests)
+  └─ PolicyDrivenSingleton.Tests.Shared (EditMode test doubles)
 ```
 
 **No external dependencies** - the library is self-contained.
@@ -159,6 +160,7 @@ Assets/Plugins/unity-policy-driven-singleton/PolicyDrivenSingleton/
 ├── Tests/
 │   ├── Runtime/                       # PlayMode tests (58 tests)
 │   ├── Editor/                        # EditMode tests (21 tests)
+│   ├── Shared/                        # EditMode test doubles
 │   └── TestExtensions.cs              # Test helpers
 ├── GlobalSingleton.cs                 # Public API (~30 lines)
 ├── SceneSingleton.cs                  # Public API (~35 lines)
@@ -177,6 +179,14 @@ Tests cover:
 - **Edge cases**: Type mismatch, inactive instances, duplicate detection, termination guards
 
 **Test isolation**: Each test uses unique singleton types to prevent cross-test contamination from static caches.
+
+**EditMode doubles**: Place EditMode test doubles outside the `Editor` folder (in `Tests/Shared`) to avoid the `AddComponent` restriction.
+
+**Test structure**: Organize tests by feature-based folders + 1 TestFixture/1 file.
+
+**SetUpFixture**: `Tests/Runtime/PolicySingletonTestSetup.cs` installs the log counter for PlayMode tests (namespace root). Avoid placing it under a sub-namespace (e.g., `...Runtime.Infrastructure`) or tests outside that scope will miss initialization.
+
+**Using order**: Keep `using` blocks in this order: System → NUnit → Unity → PolicyDrivenSingleton → alias (e.g., `using Object = UnityEngine.Object;`).
 
 ### Key Implementation Details
 

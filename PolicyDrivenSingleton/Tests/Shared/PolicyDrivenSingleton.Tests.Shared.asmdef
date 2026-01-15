@@ -1,0 +1,17 @@
+{
+    "name": "PolicyDrivenSingleton.Tests.Shared",
+    "references": [
+        "PolicyDrivenSingleton"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "optionalUnityReferences": [],
+    "noEngineReferences": false
+}
