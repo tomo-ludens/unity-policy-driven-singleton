@@ -235,7 +235,7 @@ private void Update()
 | **Play中（正常）** | キャッシュ済み → 返す / なければ検索 → 自動生成 | キャッシュ済み → 返す / なければ検索のみ |
 | **終了処理中** | `null` | `null` |
 | **Edit Mode** | 検索のみ（生成・キャッシュ更新なし） | 検索のみ |
-| **非アクティブ検出** | DEV: 例外 / Player: `null` | DEV: 例外 / Player: `null` |
+| **非アクティブ/無効コンポーネント検出時** | DEV: 例外 / Player: `null` | DEV: 例外 / Player: `null` |
 | **シーン未配置** | 自動生成 | DEV: 例外 / Player: `null` |
 | **型不一致** | 拒否（DEV: Error ログ → 破棄） | 拒否（DEV: Error ログ → 破棄） |
 | **バックグラウンドスレッド** | `null`（Error ログ出力） | `null`（Error ログ出力） |
@@ -248,8 +248,10 @@ private void Update()
 | **存在しない** | `false` + `null`（**自動生成しない**） |
 | **終了処理中** | `false` + `null` |
 | **Edit Mode** | 検索のみ（キャッシュ更新しない） |
-| **非アクティブ検出** | DEV: 例外 / Player: `false` + `null` |
+| **非アクティブ/無効コンポーネント検出時** | DEV: 例外 / Player: `false` + `null` |
 | **バックグラウンドスレッド** | `false` + `null`（Error ログ出力） |
+
+> 補足：`TryGetInstance` は `FindAnyObjectByType` を使うため、非アクティブな GameObject は既定では検索対象外です（検出時のみ例外）。
 
 #### `OnPlaySessionStart()` の呼び出しタイミング
 
@@ -408,6 +410,7 @@ PolicyDrivenSingleton/
 * **Play中はメインスレッド前提**（Unity APIを呼ぶため）
 * **厳密な型一致**：派生型など `T` と一致しない参照は拒否
 * **SceneSingleton はシーン配置必須**（自動生成しない）
+* **DEVでは重複を全探索で検出**（キャッシュ未確立時に fail-fast）
 * **Inactive/Disabled運用は避ける**（隠れ重複の原因）
 * **終了中の復活を避ける**：終了経路は `TryGetInstance` を使う（`Application.quitting` はベストエフォート）
 
