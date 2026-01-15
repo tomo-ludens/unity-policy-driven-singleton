@@ -24,16 +24,7 @@ namespace PolicyDrivenSingleton.Core
 
         internal static void EnsureInitializedForCurrentPlaySession()
         {
-            // If _mainThreadId is unset, try to infer it from Unity's SynchronizationContext.
-            if (Volatile.Read(location: ref _mainThreadId) == 0)
-            {
-                var currentSyncContext = SynchronizationContext.Current;
-                if (currentSyncContext != null && currentSyncContext.GetType().Name.Contains(value: "UnitySynchronizationContext"))
-                {
-                    Volatile.Write(location: ref _mainThreadId, value: Thread.CurrentThread.ManagedThreadId);
-                }
-            }
-
+            TryCaptureMainThreadFromCurrentContext();
             TryCaptureMainThreadContextIfOnMainThread();
         }
 
@@ -59,6 +50,12 @@ namespace PolicyDrivenSingleton.Core
             if (IsMainThread())
             {
                 return true;
+            }
+
+            if (Volatile.Read(location: ref _mainThreadId) == 0)
+            {
+                // Main-thread ID is not captured yet; avoid false error logging.
+                return false;
             }
 
             SingletonLogger.LogError(message: $"Main-thread-only API '{callerContext}' was called from background thread (id={Thread.CurrentThread.ManagedThreadId}).");
@@ -123,6 +120,26 @@ namespace PolicyDrivenSingleton.Core
             return captured != 0 && Thread.CurrentThread.ManagedThreadId == captured;
         }
 
+        private static void TryCaptureMainThreadFromCurrentContext()
+        {
+            if (Volatile.Read(location: ref _mainThreadId) != 0)
+            {
+                return;
+            }
+
+            var currentSyncContext = SynchronizationContext.Current;
+            if (!IsUnitySynchronizationContext(context: currentSyncContext))
+            {
+                return;
+            }
+
+            Volatile.Write(location: ref _mainThreadId, value: Thread.CurrentThread.ManagedThreadId);
+            if (Volatile.Read(location: ref _mainThreadSyncContext) == null)
+            {
+                Volatile.Write(location: ref _mainThreadSyncContext, value: currentSyncContext);
+            }
+        }
+
         private static void TryCaptureMainThreadContextIfOnMainThread()
         {
             if (!IsMainThread())
@@ -135,6 +152,11 @@ namespace PolicyDrivenSingleton.Core
             {
                 Volatile.Write(location: ref _mainThreadSyncContext, value: currentSyncContext);
             }
+        }
+
+        private static bool IsUnitySynchronizationContext(SynchronizationContext context)
+        {
+            return context != null && context.GetType().Name.Contains(value: "UnitySynchronizationContext");
         }
 
         [RuntimeInitializeOnLoadMethod(loadType: RuntimeInitializeLoadType.SubsystemRegistration)]

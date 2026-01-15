@@ -314,6 +314,37 @@ namespace PolicyDrivenSingleton.Core
             Destroy(obj: go);
         }
 
+        [Conditional(conditionString: "UNITY_EDITOR"), Conditional(conditionString: "DEVELOPMENT_BUILD"), Conditional(conditionString: "UNITY_ASSERTIONS")]
+        private static void ThrowIfDuplicateInstancesExistBeforeCache()
+        {
+            if (HasCachedInstance)
+            {
+                return;
+            }
+
+            var instances = FindObjectsByType<T>(
+                findObjectsInactive: FindObjectsInactive.Include,
+                sortMode: FindObjectsSortMode.None
+            );
+
+            int exactTypeCount = 0;
+            foreach (var instance in instances)
+            {
+                if (instance == null || instance.GetType() != typeof(T))
+                {
+                    continue;
+                }
+
+                exactTypeCount++;
+                if (exactTypeCount > 1)
+                {
+                    SingletonLogger.ThrowInvalidOperation<T>(
+                        message: $"Duplicate instances detected before cache establishment.\nType='{typeof(T).Name}', Count={exactTypeCount}.\nEnsure only one instance exists in the scene."
+                    );
+                }
+            }
+        }
+
         private void InitializeForCurrentPlaySessionIfNeeded()
         {
             InvalidateInstanceCacheIfPlaySessionChanged();
@@ -323,6 +354,8 @@ namespace PolicyDrivenSingleton.Core
                 Destroy(obj: gameObject);
                 return;
             }
+
+            ThrowIfDuplicateInstancesExistBeforeCache();
 
             if (!TryEstablishAsInstance())
             {
