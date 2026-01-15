@@ -390,11 +390,29 @@ PolicyDrivenSingleton/
 │   └── SceneScopedPolicy.cs                             # シーンスコープポリシー
 ├── Tests/                                               # PlayMode & EditMode テスト
 │   ├── Editor/
-│   │   ├── PolicyDrivenSingletonEditorTests.cs          # EditMode テスト
+│   │   ├── Behaviours/                                  # EditMode: behaviour系
+│   │   ├── Core/                                        # EditMode: runtime状態
+│   │   ├── Logging/                                     # EditMode: ログ
+│   │   ├── Policy/                                      # EditMode: ポリシー
 │   │   └── PolicyDrivenSingleton.Editor.Tests.asmdef
 │   ├── Runtime/
-│   │   ├── PolicyDrivenSingletonRuntimeTests.cs         # PlayMode テスト
+│   │   ├── Domain/
+│   │   ├── Doubles/
+│   │   ├── EdgeCases/
+│   │   ├── GlobalSingleton/
+│   │   ├── Hierarchy/
+│   │   ├── Infrastructure/
+│   │   ├── Lifecycle/
+│   │   ├── Policy/
+│   │   ├── Practical/
+│   │   ├── SceneSingleton/
+│   │   ├── Threading/
+│   │   ├── Validation/
+│   │   ├── PolicySingletonTestSetup.cs                  # SetUpFixture（ログカウンタ）
 │   │   └── PolicyDrivenSingleton.Tests.asmdef
+│   ├── Shared/                                          # EditMode用のテストダブル
+│   │   ├── EditModeSingletonDoubles.cs
+│   │   └── PolicyDrivenSingleton.Tests.Shared.asmdef
 │   └── TestExtensions.cs                                # テスト用ヘルパー
 ├── GlobalSingleton.cs                                   # Public API（永続・自動生成あり）
 ├── SceneSingleton.cs                                    # Public API（シーン限定・自動生成なし）
@@ -481,6 +499,12 @@ public class Bootstrap : MonoBehaviour
 PlayMode / EditMode テスト同梱（合計 **79 テスト**：PlayMode 58 / EditMode 21）
 
 **実行方法**：Window → General → Test Runner → Run All
+
+補足:
+- EditMode テスト用のテストダブルは `Tests/Shared/` に配置（Editor フォルダ外で AddComponent 可能にするため）
+- EditMode / PlayMode ともに機能別フォルダ + 1 TestFixture/1 ファイルで整理
+- Runtime の `SetUpFixture`（`PolicySingletonTestSetup`）でログカウンタを初期化（`PolicyDrivenSingleton.Tests.Runtime` 配下に適用）
+- テスト数は増減するため、Test Runner の実行結果に合わせて更新
 
 <details>
 <summary><strong>テストカバレッジ詳細</strong></summary>

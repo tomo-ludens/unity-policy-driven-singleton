@@ -1,7 +1,8 @@
 {
     "name": "PolicyDrivenSingleton.Editor.Tests",
     "references": [
-        "PolicyDrivenSingleton"
+        "PolicyDrivenSingleton",
+        "PolicyDrivenSingleton.Tests.Shared"
     ],
     "includePlatforms": [
         "Editor"
